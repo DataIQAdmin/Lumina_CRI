@@ -199,3 +199,84 @@ def rows(request, code):
     found = found[(page - 1) * PAGE_SIZE: page * PAGE_SIZE]
     return Response({**_table_json(table), "column_names": table.columns, "page": page, "page_size": PAGE_SIZE,
                      "count": count, "total": total, "positions": [r.position for r in found], "results": [r.values for r in found]})
+
+
+# ---------- Silver layer (ingestion/silver.py): the raw tables cleaned, for stewards and admins ----------
+
+SILVER = [HasRole, requires("manage_sources")]
+
+
+def _silver(table):
+    """The table's silver summary, worked out now for tables read before the silver layer existed."""
+    from ingestion.silver import summarise
+
+    if not table.silver and (table.profile or {}).get("columns"):
+        rows = list(RawRow.objects.filter(table=table).order_by("position").values_list("values", flat=True))
+        table.silver = summarise(table.columns, rows, table.profile)
+        table.save(update_fields=["silver"])
+    return table.silver or {}
+
+
+def _silver_json(t):
+    s = _silver(t)
+    return {"name": t.name, "columns": len(t.columns), "rows_in": t.rows, "rows_out": s.get("rows_out"),
+            "changed_cells": s.get("changed_cells"), "emptied": s.get("emptied"), "read_at": t.read_at.isoformat()}
+
+
+@api_view(["GET"])
+@permission_classes(SILVER)
+def silver_tables(request, code):
+    """GET /api/silver/<code>/  Every table of the connector with what its silver version changes."""
+    source, error = _source(code)
+    if error:
+        return error
+    return Response({"code": source.code, "name": source.name,
+                     "tables": [_silver_json(t) for t in source.raw_tables.all()]})
+
+
+@api_view(["GET"])
+@permission_classes(SILVER)
+def silver_table(request, code):
+    """GET /api/silver/<code>/table/?table=<name>  What cleaning changed in one table, column by column, with a few
+    examples (before and after) for roles that see personal details."""
+    source, error = _source(code)
+    if error:
+        return error
+    table, error = _table(source, request.query_params.get("table"))
+    if error:
+        return error
+    summary = _silver(table)
+    show = can(request.user, "view_pii")
+    columns = [{**c, "changes": [{**ch, "examples": ch["examples"] if show else []} for ch in c["changes"]]}
+               for c in summary.get("columns", [])]
+    return Response({**_silver_json(table), "dropped": len(summary.get("dropped", [])), "changes": columns})
+
+
+@api_view(["GET"])
+@permission_classes([HasRole, requires("manage_sources"), requires("view_pii")])
+def silver_rows(request, code):
+    """GET /api/silver/<code>/rows/?table=<name>&page=1  Cleaned rows, 50 at a time, without the exact copies.
+    changed: per row, the column positions cleaning changed; raw: what those cells were before."""
+    from ingestion.silver import LABELS, clean_row, steps_from
+
+    source, error = _source(code)
+    if error:
+        return error
+    table, error = _table(source, request.query_params.get("table"))
+    if error:
+        return error
+    summary = _silver(table)
+    try:
+        page = max(int(request.query_params.get("page", 1)), 1)
+    except ValueError:
+        page = 1
+    steps = steps_from(summary)
+    found = (RawRow.objects.filter(table=table).exclude(position__in=summary.get("dropped", []))
+             .order_by("position")[(page - 1) * PAGE_SIZE: page * PAGE_SIZE])
+    results = []
+    for r in found:
+        cleaned, changes = clean_row(r.values, table.columns, steps)
+        results.append({"position": r.position, "values": cleaned,
+                        "changed": {str(i): {"was": r.values[i], "why": LABELS[k]} for i, k in changes.items()}})
+    return Response({"column_names": table.columns, "page": page, "page_size": PAGE_SIZE,
+                     "count": summary.get("rows_out", table.rows), "results": results})

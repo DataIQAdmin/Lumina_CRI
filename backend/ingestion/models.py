@@ -80,6 +80,7 @@ class RawTable(models.Model):
     rows = models.PositiveIntegerField(default=0)
     complete = models.BooleanField(default=True)  # False when the table had more rows than Lumina reads
     profile = models.JSONField(default=dict, blank=True)  # data profiling of the rows read (table_profile.py)
+    silver = models.JSONField(default=dict, blank=True)  # what the silver layer changes (silver.py)
     read_at = models.DateTimeField(auto_now=True)
 
     class Meta:

@@ -47,6 +47,7 @@ const GROUPS: { label: string; items: NavItem[] }[] = [
     label: 'Administration',
     items: [
       { to: '/users', label: 'Users and roles', icon: 'customers', needs: ['manage_users'] },
+      { to: '/silver', label: 'Silver layer', icon: 'layers', needs: ['manage_sources'] },
       { to: '/settings', label: 'Settings', icon: 'sliders', needs: ['manage_settings'] },
     ],
   },
@@ -69,6 +70,7 @@ const PAGE_TITLES = [
   { path: '/password', title: 'Change password' },
   { path: '/compliance', title: 'Compliance' },
   { path: '/profiling', title: 'Data profiling' },
+  { path: '/silver', title: 'Silver layer' },
 ]
 
 export function Layout() {

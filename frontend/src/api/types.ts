@@ -634,3 +634,38 @@ export interface TableLink {
   missing: number
   share: number
 }
+
+// Silver layer (Administration): each raw table cleaned the same simple way (backend ingestion/silver.py).
+export interface SilverTable {
+  name: string
+  columns: number
+  rows_in: number
+  rows_out: number | null // null: read before profiling existed
+  changed_cells: number | null
+  emptied: number | null
+  read_at: string
+}
+
+export interface SilverChange {
+  key: string
+  label: string
+  count: number
+  examples: { before: string | null; after: string | null }[] // empty for roles that do not see personal details
+}
+
+export interface SilverDetail extends SilverTable {
+  dropped: number // exact copies left out
+  changes: { name: string; changes: SilverChange[] }[]
+}
+
+export interface SilverRows {
+  column_names: string[]
+  page: number
+  page_size: number
+  count: number
+  results: {
+    position: number
+    values: (string | number | boolean | null)[]
+    changed: Record<string, { was: string | number | boolean | null; why: string }>
+  }[]
+}

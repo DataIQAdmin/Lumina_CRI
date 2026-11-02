@@ -15,6 +15,7 @@ import { AuditPage } from './pages/AuditPage'
 import { ChangePasswordPage } from './pages/ChangePasswordPage'
 import { CompliancePage } from './pages/CompliancePage'
 import { ProfilingPage } from './pages/ProfilingPage'
+import { SilverPage } from './pages/SilverPage'
 import { ConnectorSetupPage } from './pages/ConnectorSetupPage'
 import { ConnectorsPage } from './pages/ConnectorsPage'
 import { CustomerDetailPage } from './pages/CustomerDetailPage'
@@ -72,6 +73,7 @@ function Routed() {
         )}
         <Route path="/connectors" element={<ConnectorsPage />} />
         <Route path="/profiling" element={<ProfilingPage />} />
+        {can('manage_sources') && <Route path="/silver" element={<SilverPage />} />}
         {can('manage_connectors') && <Route path="/connectors/new" element={<NewConnectorPage />} />}
         {can('manage_connectors') && <Route path="/connectors/:code" element={<ConnectorSetupPage />} />}
         <Route path="/how-it-works" element={<HowItWorksPage />} />
