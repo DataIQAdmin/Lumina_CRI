@@ -4738,3 +4738,15 @@ button.link {
     padding: 14px 16px;
   }
 }
+
+/* Raw rows scroll under a solid header: the header sits above the rows (whose fade-in would otherwise paint
+   over it), and paging does not fade the rows again. */
+.raw-preview thead th {
+  z-index: 2;
+  background: var(--surface-2);
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+
+.raw-preview tbody tr {
+  animation: none;
+}

@@ -102,9 +102,10 @@ export function ConnectorSetupPage() {
         crumbs={[{ label: 'Connectors', to: '/connectors' }, { label: s?.name ?? '...' }]}
       />
       {(source.error || catalog.error) && <ErrorAlert message={source.error ?? catalog.error ?? ''} />}
-      {source.data === null && <ErrorAlert message="No connector with this code." />}
+      {/* useApi starts with null too, so only say "no connector" once the list has loaded without it. */}
+      {!source.loading && !source.error && source.data === null && <ErrorAlert message="No connector with this code." />}
       {!s || !catalog.data ? (
-        source.data !== null && (
+        (source.loading || source.data !== null) && (
           <div className="card">
             <Loader kind="orbit" label="Loading the connector" />
           </div>
