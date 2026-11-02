@@ -108,3 +108,12 @@ def test_profile_and_drill_down_api(files):
     orphans = admin.get(f"/api/raw/{code}/rows/", {"table": "customer_email", "column": "CustomerID",
                                                    "rule": "link"}).json()
     assert orphans["results"] == [["E2", "C9"], ["E3", "C8"]]
+
+
+def test_a_table_read_before_profiling_sends_no_profile(files):
+    from ingestion.models import RawTable
+
+    admin, code = files
+    RawTable.objects.filter(name="customer_master").update(profile={})
+    body = admin.get(f"/api/raw/{code}/profile/", {"table": "customer_master"}).json()
+    assert body["profile"] == {} and body["score"] is None  # the screen asks for the table to be read again

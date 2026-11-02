@@ -40,7 +40,10 @@ def _table_json(t):
 
 def _without_positions(profile, show_values):
     """The profile for the screen: row positions stay on the server (drill-down asks for them by rule), and the
-    most common values (names, emails...) only for roles that see personal details."""
+    most common values (names, emails...) only for roles that see personal details. A table read before
+    profiling existed has no profile: {} is sent, and the screen asks for the table to be read again."""
+    if not profile.get("columns"):
+        return {}
     columns = []
     for c in profile.get("columns", []):
         c = {**c, "rules": [{k: v for k, v in r.items() if k != "positions"} for r in c["rules"]]}

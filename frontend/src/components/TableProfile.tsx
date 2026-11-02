@@ -60,7 +60,8 @@ export function TableDetail({
   const data = useApi(() => api.rawProfile(code, table.name), [code, table.name, table.read_at])
   const [drill, setDrill] = useState<Drill | null>(null)
   const raw = data.data?.profile
-  const profile = raw && 'columns' in raw ? (raw as TableProfile) : null
+  // A table read before profiling existed has no profile yet: the screen asks for it to be read again.
+  const profile = raw && Array.isArray(raw.columns) && typeof raw.rows === 'number' ? (raw as TableProfile) : null
 
   const open = (d: Drill) => {
     setDrill(d)
