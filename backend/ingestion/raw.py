@@ -52,12 +52,15 @@ def _value(value):
     return value
 
 
-def protect(columns, row):
-    """(values, protected) for one row: identity-number values masked, their shape and fingerprint set aside."""
+def protect(columns, row, identity=None):
+    """(values, protected) for one row: identity-number values masked, their shape and fingerprint set aside.
+    identity: the table's identity-number columns, worked out once per table by the caller when it can."""
+    if identity is None:
+        identity = {c for c in columns if is_identity(c)}
     values, protected = [], {}
     for column, value in zip(columns, row):
         value = _value(value)
-        if value not in (None, "") and is_identity(column):
+        if value not in (None, "") and column in identity:
             text = str(value).strip()
             protected[column] = [shape(text), crypto.fingerprint(text)[:16]]
             value = mask(text)
@@ -116,8 +119,9 @@ def read_table(source, name):
     cap = settings.CONNECTOR_MAX_ROWS
     columns, rows = _fetch(source, name, cap + 1)  # one extra row tells whether the table is bigger than the cap
     complete = len(rows) <= cap
-    safe = [protect(columns, row) for row in rows[:cap]]  # (values, protected) per row
     sensitive = [c for c in columns if is_identity(c)]
+    identity = set(sensitive)
+    safe = [protect(columns, row, identity) for row in rows[:cap]]  # (values, protected) per row
     profile = profile_table(columns, [v for v, _ in safe], [p for _, p in safe], set(sensitive))
     silver = summarise(columns, [v for v, _ in safe], profile)
     with transaction.atomic():

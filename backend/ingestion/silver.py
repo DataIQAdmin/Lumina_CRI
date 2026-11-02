@@ -16,10 +16,12 @@ Per row: exact copies of an earlier row (apart from their own ID) are left out.
 """
 
 import re
+from functools import lru_cache
 
 from .table_profile import EMAIL, PERCENT, _phone_rule, date_format, kind
 
 KEEP_EXAMPLES = 3
+NOTHING = frozenset()
 
 LABELS = {
     "spaces": "Extra spaces removed",
@@ -58,7 +60,7 @@ def plan(profile):
             for key in ("email", "phone", "pincode"):
                 if key in rules:
                     wanted.add(key)
-        steps[c["name"]] = wanted
+        steps[c["name"]] = frozenset(wanted)
     return steps
 
 
@@ -78,6 +80,11 @@ def clean_value(value, steps):
         return None, None
     if not isinstance(value, str):
         return value, None
+    return _clean_text(value, steps if isinstance(steps, frozenset) else frozenset(steps))
+
+
+@lru_cache(maxsize=20_000)  # each distinct value and set of steps is worked out once
+def _clean_text(value, steps):
     if "excel" in steps:
         return (None, "excel") if re.fullmatch(r"X*[\d.]*[eE][+-]?\d+", value.strip()) else (value, None)
     if "text" not in steps:
@@ -116,7 +123,7 @@ def clean_row(values, columns, steps):
     """(cleaned values, {column index: change key})."""
     out, changes = [], {}
     for i, value in enumerate(values):
-        new, change = clean_value(value, steps.get(columns[i], set()) if i < len(columns) else set())
+        new, change = clean_value(value, steps.get(columns[i], NOTHING) if i < len(columns) else NOTHING)
         out.append(new)
         if change:
             changes[i] = change
@@ -165,5 +172,5 @@ def _later_copies(rows, key, columns):
 
 
 def steps_from(summary):
-    return {k: set(v) for k, v in (summary.get("steps") or {}).items()}
+    return {k: frozenset(v) for k, v in (summary.get("steps") or {}).items()}
 
