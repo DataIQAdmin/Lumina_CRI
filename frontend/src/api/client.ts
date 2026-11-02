@@ -35,6 +35,9 @@ import type {
   RawSources,
   RawTable,
   RawTableProfile,
+  SilverDetail,
+  SilverRows,
+  SilverTable,
   TableLink,
   User,
 } from './types'
@@ -223,6 +226,11 @@ export const api = {
   rawProfile: (code: string, table: string) =>
     get<RawTableProfile>(`/raw/${code}/profile/?table=${encodeURIComponent(table)}`),
   rawLinks: (code: string) => get<{ relationships: TableLink[] }>(`/raw/${code}/relationships/`),
+  silverTables: (code: string) => get<{ code: string; name: string; tables: SilverTable[] }>(`/silver/${code}/`),
+  silverTable: (code: string, table: string) =>
+    get<SilverDetail>(`/silver/${code}/table/?table=${encodeURIComponent(table)}`),
+  silverRows: (code: string, table: string, page: number) =>
+    get<SilverRows>(`/silver/${code}/rows/?table=${encodeURIComponent(table)}&page=${page}`),
   connectorFiles: (code: string) => get<UploadedFile[]>(`/connectors/${code}/files/`),
   setFileStatus: (code: string, ids: number[], status: UploadedFile['status']) =>
     post<{ changed: number; files: UploadedFile[] }>(`/connectors/${code}/files/status/`, { ids, status }),

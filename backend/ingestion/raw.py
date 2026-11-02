@@ -110,6 +110,7 @@ def _fetch(source, name, limit):
 
 def read_table(source, name):
     """Read one table whole, profile it and store both, replacing what was read before. Returns the RawTable."""
+    from .silver import summarise
     from .table_profile import profile_table
 
     cap = settings.CONNECTOR_MAX_ROWS
@@ -118,11 +119,12 @@ def read_table(source, name):
     safe = [protect(columns, row) for row in rows[:cap]]  # (values, protected) per row
     sensitive = [c for c in columns if is_identity(c)]
     profile = profile_table(columns, [v for v, _ in safe], [p for _, p in safe], set(sensitive))
+    silver = summarise(columns, [v for v, _ in safe], profile)
     with transaction.atomic():
         table, _ = RawTable.objects.update_or_create(
             source=source, name=name,
             defaults={"columns": columns, "sensitive": sensitive, "rows": len(safe), "complete": complete,
-                      "profile": profile},
+                      "profile": profile, "silver": silver},
         )
         table.row_set.all().delete()
         for start in range(0, len(safe), BATCH):

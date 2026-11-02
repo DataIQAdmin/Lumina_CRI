@@ -4750,3 +4750,52 @@ button.link {
 .raw-preview tbody tr {
   animation: none;
 }
+
+/* Silver layer (SilverPage.tsx) */
+.silver-rules {
+  padding: 0;
+}
+
+.silver-rules summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 20px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.silver-rules ul {
+  margin: 0;
+  padding: 0 20px 16px 44px;
+  display: grid;
+  gap: 4px;
+  color: var(--text-2);
+  font-size: var(--text-sm);
+}
+
+.silver-example {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.silver-example code {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.silver-emptied {
+  color: var(--warn-text);
+}
+
+.raw-preview td.silver-cell {
+  background: color-mix(in srgb, var(--good-dot) 12%, transparent);
+}
+
+.raw-preview td.silver-cell.is-emptied {
+  background: color-mix(in srgb, var(--warn-dot) 16%, transparent);
+}
