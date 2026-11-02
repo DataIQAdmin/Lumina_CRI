@@ -109,26 +109,27 @@ def _fetch(source, name, limit):
 
 
 def read_table(source, name):
-    """Read one table whole and store it, replacing what was read before. Returns the RawTable."""
+    """Read one table whole, profile it and store both, replacing what was read before. Returns the RawTable."""
+    from .table_profile import profile_table
+
     cap = settings.CONNECTOR_MAX_ROWS
     columns, rows = _fetch(source, name, cap + 1)  # one extra row tells whether the table is bigger than the cap
     complete = len(rows) <= cap
-    rows = rows[:cap]
+    safe = [protect(columns, row) for row in rows[:cap]]  # (values, protected) per row
+    sensitive = [c for c in columns if is_identity(c)]
+    profile = profile_table(columns, [v for v, _ in safe], [p for _, p in safe], set(sensitive))
     with transaction.atomic():
         table, _ = RawTable.objects.update_or_create(
             source=source, name=name,
-            defaults={"columns": columns, "sensitive": [c for c in columns if is_identity(c)], "rows": len(rows),
-                      "complete": complete},
+            defaults={"columns": columns, "sensitive": sensitive, "rows": len(safe), "complete": complete,
+                      "profile": profile},
         )
         table.row_set.all().delete()
-        batch = []
-        for position, row in enumerate(rows):
-            values, protected = protect(columns, row)
-            batch.append(RawRow(table=table, position=position, values=values, protected=protected))
-            if len(batch) >= BATCH:
-                RawRow.objects.bulk_create(batch)
-                batch = []
-        RawRow.objects.bulk_create(batch)
+        for start in range(0, len(safe), BATCH):
+            RawRow.objects.bulk_create(
+                RawRow(table=table, position=start + i, values=values, protected=protected)
+                for i, (values, protected) in enumerate(safe[start:start + BATCH])
+            )
     return table
 
 

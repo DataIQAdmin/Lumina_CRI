@@ -79,6 +79,7 @@ class RawTable(models.Model):
     sensitive = models.JSONField(default=list)  # identity-number columns, kept only masked (see raw.protect)
     rows = models.PositiveIntegerField(default=0)
     complete = models.BooleanField(default=True)  # False when the table had more rows than Lumina reads
+    profile = models.JSONField(default=dict, blank=True)  # data profiling of the rows read (table_profile.py)
     read_at = models.DateTimeField(auto_now=True)
 
     class Meta:

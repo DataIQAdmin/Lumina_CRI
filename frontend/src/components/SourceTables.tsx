@@ -165,6 +165,8 @@ function ConnectorTables({
                   <th>Table</th>
                   <th className="num">Rows</th>
                   <th className="num">Columns</th>
+                  <th className="num">Quality</th>
+                  <th className="num">Issues</th>
                   <th>Identity numbers</th>
                   <th>Read</th>
                 </tr>
@@ -186,6 +188,16 @@ function ConnectorTables({
                     </td>
                     <td className="num">{t.rows.toLocaleString('en-IN')}</td>
                     <td className="num">{t.columns}</td>
+                    <td className="num">
+                      {t.score === null ? (
+                        <span className="muted">—</span>
+                      ) : (
+                        <span className={`raw-score is-${t.score >= 95 ? 'good' : t.score >= 80 ? 'fix' : 'bad'}`}>
+                          {Math.round(t.score)}%
+                        </span>
+                      )}
+                    </td>
+                    <td className="num">{t.issues || <span className="muted">0</span>}</td>
                     <td className="text-sm muted">{t.sensitive.length ? `${t.sensitive.join(', ')} (masked)` : '—'}</td>
                     <td className="text-sm muted">{formatDateTime(t.read_at)}</td>
                   </tr>
