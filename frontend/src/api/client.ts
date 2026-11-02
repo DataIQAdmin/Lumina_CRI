@@ -34,6 +34,8 @@ import type {
   RawRows,
   RawSources,
   RawTable,
+  RawTableProfile,
+  TableLink,
   User,
 } from './types'
 import { ORG_BASE } from '../organization'
@@ -213,8 +215,14 @@ export const api = {
   rawTables: (code: string) => get<{ code: string; name: string; tables: RawTable[] }>(`/raw/${code}/`),
   rawDiscover: (code: string) => post<{ tables: string[]; dropped: number }>(`/raw/${code}/discover/`),
   rawRead: (code: string, table: string) => post<RawTable>(`/raw/${code}/read/`, { table }),
-  rawRows: (code: string, table: string, page: number) =>
-    get<RawRows>(`/raw/${code}/rows/?table=${encodeURIComponent(table)}&page=${page}`),
+  rawRows: (code: string, table: string, page: number, drill?: { column?: string; rule: string }) =>
+    get<RawRows>(
+      `/raw/${code}/rows/?table=${encodeURIComponent(table)}&page=${page}` +
+        (drill ? `&rule=${encodeURIComponent(drill.rule)}&column=${encodeURIComponent(drill.column ?? '')}` : ''),
+    ),
+  rawProfile: (code: string, table: string) =>
+    get<RawTableProfile>(`/raw/${code}/profile/?table=${encodeURIComponent(table)}`),
+  rawLinks: (code: string) => get<{ relationships: TableLink[] }>(`/raw/${code}/relationships/`),
   connectorFiles: (code: string) => get<UploadedFile[]>(`/connectors/${code}/files/`),
   setFileStatus: (code: string, ids: number[], status: UploadedFile['status']) =>
     post<{ changed: number; files: UploadedFile[] }>(`/connectors/${code}/files/status/`, { ids, status }),

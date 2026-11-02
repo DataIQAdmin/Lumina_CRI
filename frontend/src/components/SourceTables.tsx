@@ -1,19 +1,23 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 
 import { api } from '../api/client'
-import type { RawTable } from '../api/types'
 import { useApi } from '../api/useApi'
 import { formatDateTime } from '../format'
 import { Icon } from './Icon'
 import { Loader } from './Loader'
+import { TABLE_TABS, TableDetail, type TableTab } from './TableProfile'
 import { useToast } from './Toasts'
 import { Card, EmptyState, ErrorAlert, StatusBadge } from './ui'
 
-// Data profiling, raw layer: pick a connector, read all its tables, then open a table to see its rows exactly as
-// the system holds them. Identity numbers (PAN, Aadhaar, passport...) arrive already masked from the server.
+// Data profiling, raw layer: pick a connector, read all its tables, then open a table for its profile and rows.
+// Identity numbers (PAN, Aadhaar, passport...) arrive already masked from the server. The chosen connector,
+// table and tab live in the address (?source=&table=&tab=), so a refresh or a shared link opens the same view.
 export function SourceTables() {
   const sources = useApi(() => api.rawSources(), [])
-  const [code, setCode] = useState<string | null>(null)
+  const [params, setParams] = useSearchParams()
+  const code = params.get('source')
+  const setCode = (next: string) => setParams({ view: 'tables', source: next }, { replace: true })
   const list = sources.data?.sources ?? []
   const chosen = list.find((s) => s.code === code) ?? list.find((s) => s.tables > 0) ?? list[0]
 
@@ -76,7 +80,12 @@ function ConnectorTables({
 }) {
   const toast = useToast()
   const tables = useApi(() => api.rawTables(code), [code])
-  const [open, setOpen] = useState<string | null>(null)
+  const [params, setParams] = useSearchParams()
+  const open = params.get('table')
+  const tabParam = params.get('tab') as TableTab | null
+  const tab: TableTab = TABLE_TABS.some((t) => t.value === tabParam) ? tabParam! : 'overview'
+  const setOpen = (table: string | null, nextTab: TableTab = 'overview') =>
+    setParams(table ? { view: 'tables', source: code, table, tab: nextTab } : { view: 'tables', source: code })
   const [progress, setProgress] = useState<{
     done: number
     total: number
@@ -113,6 +122,20 @@ function ConnectorTables({
   const rows = tables.data?.tables ?? []
   const totalRows = rows.reduce((n, t) => n + t.rows, 0)
   const shown = rows.find((t) => t.name === open)
+
+  if (shown && !progress) {
+    return (
+      <TableDetail
+        key={shown.name}
+        code={code}
+        table={shown}
+        tab={tab}
+        onTab={(next) => setOpen(shown.name, next)}
+        onBack={() => setOpen(null)}
+        canViewRows={canViewRows}
+      />
+    )
+  }
 
   return (
     <>
@@ -173,13 +196,9 @@ function ConnectorTables({
               </thead>
               <tbody>
                 {rows.map((t) => (
-                  <tr
-                    key={t.name}
-                    className={`raw-table-row${t.name === open ? ' is-on' : ''}`}
-                    onClick={() => setOpen(t.name === open ? null : t.name)}
-                  >
+                  <tr key={t.name} className="raw-table-row" onClick={() => setOpen(t.name)}>
                     <td>
-                      <button type="button" className="link" aria-expanded={t.name === open}>
+                      <button type="button" className="link">
                         {t.name}
                       </button>
                       {!t.complete && (
@@ -193,7 +212,7 @@ function ConnectorTables({
                         <span className="muted">—</span>
                       ) : (
                         <span className={`raw-score is-${t.score >= 95 ? 'good' : t.score >= 80 ? 'fix' : 'bad'}`}>
-                          {Math.round(t.score)}%
+                          {t.score < 100 ? Math.min(Math.round(t.score), 99) : 100}%
                         </span>
                       )}
                     </td>
@@ -207,78 +226,6 @@ function ConnectorTables({
           </div>
         )}
       </Card>
-      {shown && <TablePreview key={shown.name} code={code} table={shown} canViewRows={canViewRows} />}
     </>
-  )
-}
-
-function TablePreview({ code, table, canViewRows }: { code: string; table: RawTable; canViewRows: boolean }) {
-  const [page, setPage] = useState(1)
-  const rows = useApi(
-    () => (canViewRows ? api.rawRows(code, table.name, page) : Promise.resolve(null)),
-    [code, table.name, page, canViewRows],
-  )
-  const pages = Math.max(1, Math.ceil(table.rows / 50))
-  const sensitive = new Set(table.sensitive)
-
-  return (
-    <Card
-      flush
-      title={table.name}
-      description={`${table.rows.toLocaleString('en-IN')} rows · ${table.columns} columns · values exactly as the system sent them`}
-      actions={
-        canViewRows &&
-        pages > 1 && (
-          <div className="row" style={{ gap: 6 }}>
-            <button type="button" className="btn btn-sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-              Previous
-            </button>
-            <span className="text-sm muted num">
-              Page {page} of {pages}
-            </span>
-            <button type="button" className="btn btn-sm" disabled={page >= pages} onClick={() => setPage(page + 1)}>
-              Next
-            </button>
-          </div>
-        )
-      }
-    >
-      {!canViewRows && (
-        <EmptyState icon="lock" title="Rows hidden for your role">
-          Your role sees table sizes only.
-        </EmptyState>
-      )}
-      {rows.error && <ErrorAlert message={rows.error} />}
-      {canViewRows && !rows.data && !rows.error && <Loader kind="scan" label="Loading rows" />}
-      {rows.data && (
-        <div className="table-wrap raw-preview">
-          <table className="table">
-            <thead>
-              <tr>
-                <th className="num">#</th>
-                {rows.data.column_names.map((c) => (
-                  <th key={c}>
-                    {c}
-                    {sensitive.has(c) && <Icon name="lock" size={12} className="raw-lock" />}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.data.results.map((r, i) => (
-                <tr key={i}>
-                  <td className="num muted">{(page - 1) * 50 + i + 1}</td>
-                  {r.map((v, j) => (
-                    <td key={j} title={v === null ? 'Empty' : String(v)}>
-                      {v === null || v === '' ? <span className="raw-empty">empty</span> : String(v)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </Card>
   )
 }
