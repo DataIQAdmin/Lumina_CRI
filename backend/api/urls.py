@@ -19,6 +19,8 @@ urlpatterns = [
     path("raw/<slug:code>/discover/", raw_views.discover),
     path("raw/<slug:code>/read/", raw_views.read),
     path("raw/<slug:code>/rows/", raw_views.rows),
+    path("raw/<slug:code>/profile/", raw_views.profile),
+    path("raw/<slug:code>/relationships/", raw_views.links),
     path("customers/<int:pk>/interactions/", interaction_views.customer_interactions),
     path("customers/<int:pk>/briefing/", interaction_views.customer_briefing),
     path("interactions/open/", interaction_views.open_items),

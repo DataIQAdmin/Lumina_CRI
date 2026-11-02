@@ -4516,3 +4516,19 @@ button.link {
   color: var(--text-3);
   font-style: italic;
 }
+
+.raw-score {
+  font-weight: 600;
+}
+
+.raw-score.is-good {
+  color: var(--good-text);
+}
+
+.raw-score.is-fix {
+  color: var(--warn-text);
+}
+
+.raw-score.is-bad {
+  color: var(--bad-text);
+}

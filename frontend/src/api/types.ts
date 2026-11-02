@@ -562,6 +562,8 @@ export interface RawTable {
   complete: boolean // false: the table has more rows than Lumina reads
   sensitive: string[] // identity-number columns, stored masked
   read_at: string
+  score: number | null // share of rule checks passed, 0 to 100 (null: read before profiling existed)
+  issues: number // rules broken by at least one row
 }
 
 export interface RawRows extends RawTable {
