@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { api } from '../api/client'
@@ -6,6 +6,7 @@ import type { ProfileCheck } from '../api/types'
 import { useApi } from '../api/useApi'
 import { Icon } from '../components/Icon'
 import { Loader } from '../components/Loader'
+import { SourceTables } from '../components/SourceTables'
 import { Card, EmptyState, ErrorAlert, PageHeader } from '../components/ui'
 
 // A chosen bar: "<check key>:<value>", the form the API takes.
@@ -68,9 +69,38 @@ const SHOWN: { field: 'name' | 'mobile' | 'pan' | 'email' | 'dob' | 'gender' | '
   { field: 'residency', label: 'Residency' },
 ]
 
-// Data profiling: how each column looks as the bank's systems send it, before Lumina cleans it.
-// The scorecard picks a column; bars inside it filter the records, which open in a side panel.
+type View = 'tables' | 'fields'
+
+// Data profiling. Source tables: every table of a connector, read whole as the system holds it (the raw layer).
+// Customer fields: the checks on the columns each connector maps to Lumina's customer fields.
 export function ProfilingPage() {
+  const [view, setView] = useState<View>('tables')
+  const switcher = (
+    <div className="segmented" role="group" aria-label="Profile by">
+      <button type="button" aria-pressed={view === 'tables'} onClick={() => setView('tables')}>
+        Source tables
+      </button>
+      <button type="button" aria-pressed={view === 'fields'} onClick={() => setView('fields')}>
+        Customer fields
+      </button>
+    </div>
+  )
+  if (view === 'fields') return <CustomerFieldsProfile switcher={switcher} />
+  return (
+    <>
+      <PageHeader
+        title="Data profiling"
+        description="Pick a connector, read its tables, then open a table to see its rows as the system holds them."
+        actions={switcher}
+      />
+      <SourceTables />
+    </>
+  )
+}
+
+// How each mapped column looks as the bank's systems send it, before Lumina cleans it.
+// The scorecard picks a column; bars inside it filter the records, which open in a side panel.
+function CustomerFieldsProfile({ switcher }: { switcher: ReactNode }) {
   const [source, setSource] = useState('all')
   const [column, setColumn] = useState<string | null>(null)
   const [picks, setPicks] = useState<Pick[]>([])
@@ -127,23 +157,26 @@ export function ProfilingPage() {
         title="Data profiling"
         description="How each column looks as your systems send it, before Lumina cleans it."
         actions={
-          <select
-            className="select"
-            aria-label="Systems to profile"
-            value={source}
-            onChange={(e) => {
-              setSource(e.target.value)
-              setPicks([])
-              setPanelOpen(false)
-            }}
-          >
-            <option value="all">All connected systems</option>
-            {data?.sources.map((s) => (
-              <option key={s.code} value={s.code}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+          <>
+            {switcher}
+            <select
+              className="select"
+              aria-label="Systems to profile"
+              value={source}
+              onChange={(e) => {
+                setSource(e.target.value)
+                setPicks([])
+                setPanelOpen(false)
+              }}
+            >
+              <option value="all">All connected systems</option>
+              {data?.sources.map((s) => (
+                <option key={s.code} value={s.code}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </>
         }
       />
 

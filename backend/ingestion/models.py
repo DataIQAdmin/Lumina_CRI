@@ -67,3 +67,38 @@ class SourceRecord(models.Model):
 
     def __str__(self):
         return f"{self.source.code}:{self.source_record_id} {self.name}"
+
+
+class RawTable(models.Model):
+    """One table (or collection, or uploaded CSV file) of a source system, read whole for data profiling.
+    The raw layer: every column and row as the system holds it, before any cleaning (ingestion/raw.py)."""
+
+    source = models.ForeignKey(Source, on_delete=models.CASCADE, related_name="raw_tables")
+    name = models.CharField(max_length=200)  # e.g. "core.customer_master", or the file name without ".csv"
+    columns = models.JSONField(default=list)
+    sensitive = models.JSONField(default=list)  # identity-number columns, kept only masked (see raw.protect)
+    rows = models.PositiveIntegerField(default=0)
+    complete = models.BooleanField(default=True)  # False when the table had more rows than Lumina reads
+    read_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["source", "name"]
+        constraints = [models.UniqueConstraint(fields=["source", "name"], name="unique_raw_table_per_source")]
+
+    def __str__(self):
+        return f"{self.source.code}:{self.name}"
+
+
+class RawRow(models.Model):
+    """One row of a RawTable: its values in the table's column order."""
+
+    table = models.ForeignKey(RawTable, on_delete=models.CASCADE, related_name="row_set")
+    position = models.PositiveIntegerField()
+    values = models.JSONField(encoder=DjangoJSONEncoder)
+    # For identity-number columns: {column: [shape, fingerprint]}, e.g. ["AAAAA9999A", "3f9c..."], so profiling
+    # can check the pattern and find duplicates without the readable number ever being stored.
+    protected = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["table", "position"]
+        indexes = [models.Index(fields=["table", "position"])]

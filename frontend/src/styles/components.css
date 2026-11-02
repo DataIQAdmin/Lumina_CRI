@@ -4422,3 +4422,97 @@ button.link {
   padding: 6px 10px;
 }
 .agree .records-note { font-size: var(--text-xs); color: var(--text-3); }
+
+/* ============ Data profiling: source tables (raw layer) ============ */
+
+.raw-sources {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.raw-source {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.raw-source:hover {
+  border-color: var(--accent);
+}
+
+.raw-source.is-on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.raw-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-sm);
+}
+
+.raw-progress-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.raw-progress-bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+.raw-table-row {
+  cursor: pointer;
+}
+
+.raw-table-row td:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.raw-table-row:hover td,
+.raw-table-row.is-on td {
+  background: var(--surface-2);
+}
+
+.raw-preview {
+  max-height: 560px;
+  overflow: auto;
+}
+
+.raw-preview td {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 8px 14px;
+}
+
+.raw-lock {
+  margin-left: 4px;
+  vertical-align: -2px;
+}
+
+.raw-empty {
+  color: var(--text-3);
+  font-style: italic;
+}
