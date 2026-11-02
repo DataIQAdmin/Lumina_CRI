@@ -12,7 +12,9 @@ column (customer_address.CustomerID -> customer_master.CustomerID) should only h
 """
 
 import re
+import string
 from collections import Counter
+from functools import lru_cache
 from datetime import date, datetime
 
 from .raw import _words
@@ -48,6 +50,12 @@ def _empty(value):
     return value is None or (isinstance(value, str) and not value.strip())
 
 
+# Results per distinct value are remembered: most columns repeat a few values thousands of times, and the
+# hosted server has little CPU, so each value is worked out once.
+CACHE = 20_000  # entries per cache: enough for repeated values, small enough for a 512 MB server
+
+
+@lru_cache(maxsize=CACHE)
 def date_format(text):
     """(label, date) of a date written in one of the known formats, else (None, None). An impossible date
     such as 31-02-2020 gives (label, None)."""
@@ -69,7 +77,11 @@ def kind(value):
         return "integer"
     if isinstance(value, float):
         return "decimal"
-    text = str(value).strip()
+    return _kind_text(str(value).strip())
+
+
+@lru_cache(maxsize=CACHE)
+def _kind_text(text):
     if text.lower() in BOOLEAN:
         return "boolean"
     if INTEGER.match(text):
@@ -89,10 +101,15 @@ def kind(value):
     return "text"
 
 
+SHAPES = str.maketrans(string.ascii_uppercase + string.ascii_lowercase + string.digits,
+                       "A" * 26 + "a" * 26 + "9" * 10)
+
+
+@lru_cache(maxsize=CACHE)
 def pattern(text):
     """A short pattern of a value: capitals A, small letters a, digits 9; long runs counted.
     "ABCDE1234F" -> "AAAAA9999A"; "7676fa73-b087-..." -> "9999aa99-a999-..."; "100000000000" -> "9×12"."""
-    shaped = re.sub(r"[0-9]", "9", re.sub(r"[a-z]", "a", re.sub(r"[A-Z]", "A", text)))
+    shaped = text.translate(SHAPES)
     return re.sub(r"(A|a|9)\1{5,}", lambda m: f"{m.group(1)}×{len(m.group(0))}", shaped)[:40]
 
 
@@ -221,7 +238,15 @@ def profile_column(column, values, protected=None):
             fingerprints = {i: protected[i][1] for i in filled if protected[i]}
             bad = [i for i, f in fingerprints.items() if same[f] > 1]
         else:
-            bad = [i for i in filled if not check(values[i], texts[i])]
+            seen = {}  # result per distinct value
+
+            def fine(i):
+                key = (values[i], texts[i])
+                if key not in seen:
+                    seen[key] = check(values[i], texts[i])
+                return seen[key]
+
+            bad = [i for i in filled if not fine(i)]
         rule_rows.append((key, label, bad))
     if rows and len(filled) == 0:
         rule_rows.append(("filled", "Has values", list(range(rows))))

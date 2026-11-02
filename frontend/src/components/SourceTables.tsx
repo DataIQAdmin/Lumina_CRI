@@ -103,8 +103,13 @@ function ConnectorTables({
         setProgress({ done: i, total: names.length, table: name })
         try {
           await api.rawRead(code, name)
-        } catch (e) {
-          problems.push({ table: name, error: (e as Error).message })
+        } catch {
+          // One more try: the hosted server may have restarted halfway; reading a table again is safe.
+          try {
+            await api.rawRead(code, name)
+          } catch (e) {
+            problems.push({ table: name, error: (e as Error).message })
+          }
         }
       }
       setFailed(problems)
