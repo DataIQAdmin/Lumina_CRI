@@ -31,6 +31,9 @@ import type {
   TableRemoval,
   ProfilingSummary,
   ProfiledRecords,
+  RawRows,
+  RawSources,
+  RawTable,
   User,
 } from './types'
 import { ORG_BASE } from '../organization'
@@ -206,6 +209,12 @@ export const api = {
       `/profiling/records/?source=${encodeURIComponent(source)}&page=${page}&page_size=${pageSize}` +
         checks.map((c) => `&check=${encodeURIComponent(c)}`).join(''),
     ),
+  rawSources: () => get<RawSources>('/raw/'),
+  rawTables: (code: string) => get<{ code: string; name: string; tables: RawTable[] }>(`/raw/${code}/`),
+  rawDiscover: (code: string) => post<{ tables: string[]; dropped: number }>(`/raw/${code}/discover/`),
+  rawRead: (code: string, table: string) => post<RawTable>(`/raw/${code}/read/`, { table }),
+  rawRows: (code: string, table: string, page: number) =>
+    get<RawRows>(`/raw/${code}/rows/?table=${encodeURIComponent(table)}&page=${page}`),
   connectorFiles: (code: string) => get<UploadedFile[]>(`/connectors/${code}/files/`),
   setFileStatus: (code: string, ids: number[], status: UploadedFile['status']) =>
     post<{ changed: number; files: UploadedFile[] }>(`/connectors/${code}/files/status/`, { ids, status }),

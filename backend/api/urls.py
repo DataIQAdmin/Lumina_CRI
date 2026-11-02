@@ -1,7 +1,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from . import admin_views, connector_views, ingest_views, interaction_views, profiling_views, views
+from . import admin_views, connector_views, ingest_views, interaction_views, profiling_views, raw_views, views
 
 router = DefaultRouter()
 router.register("sources", views.SourceViewSet, basename="source")
@@ -14,6 +14,11 @@ router.register("users", admin_views.UserViewSet, basename="user")
 urlpatterns = [
     path("profiling/", profiling_views.summary),
     path("profiling/records/", profiling_views.records),
+    path("raw/", raw_views.sources),
+    path("raw/<slug:code>/", raw_views.tables),
+    path("raw/<slug:code>/discover/", raw_views.discover),
+    path("raw/<slug:code>/read/", raw_views.read),
+    path("raw/<slug:code>/rows/", raw_views.rows),
     path("customers/<int:pk>/interactions/", interaction_views.customer_interactions),
     path("customers/<int:pk>/briefing/", interaction_views.customer_briefing),
     path("interactions/open/", interaction_views.open_items),

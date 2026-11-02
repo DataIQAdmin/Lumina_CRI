@@ -538,3 +538,35 @@ export interface CustomerBreakdown {
   dimensions: { key: string; label: string }[]
   options: Record<string, { key: string; label: string; count: number; members?: string[] }[]>
 }
+
+// Raw layer (Data profiling, Source tables): every table of a connector, read whole as the system holds it.
+export interface RawSource {
+  code: string
+  name: string
+  connector_type: string
+  enabled: boolean
+  tables: number // tables read so far
+  read_at: string | null
+}
+
+export interface RawSources {
+  sources: RawSource[]
+  can_read: boolean // stewards and admins
+  can_view_rows: boolean
+}
+
+export interface RawTable {
+  name: string
+  columns: number
+  rows: number
+  complete: boolean // false: the table has more rows than Lumina reads
+  sensitive: string[] // identity-number columns, stored masked
+  read_at: string
+}
+
+export interface RawRows extends RawTable {
+  column_names: string[]
+  page: number
+  page_size: number
+  results: (string | number | boolean | null)[][]
+}
