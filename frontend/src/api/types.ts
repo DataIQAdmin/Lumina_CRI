@@ -570,5 +570,67 @@ export interface RawRows extends RawTable {
   column_names: string[]
   page: number
   page_size: number
+  count: number // rows on offer: the whole table, or the rows breaking the chosen rule (up to 500 kept)
+  total: number // rows breaking the rule in all
+  positions: number[]
   results: (string | number | boolean | null)[][]
+}
+
+// Data profile of one raw table (backend ingestion/table_profile.py).
+export interface ProfileRule {
+  key: string // e.g. "email", "unique", "formats"
+  label: string
+  checked: number
+  failed: number
+}
+
+export interface ColumnProfile {
+  name: string
+  type: string
+  type_label: string
+  identity: boolean // identity number: only patterns, never values
+  key?: boolean // the table's own ID column
+  rows: number
+  empty: number
+  distinct: number
+  duplicates: number
+  min_length: number | null
+  max_length: number | null
+  min?: number | string
+  max?: number | string
+  patterns: { value: string; count: number }[]
+  pattern_count: number
+  top: { value: string; count: number }[] // empty for roles that do not see personal details
+  types: { type: string; label: string; count: number }[]
+  date_formats?: { format: string; count: number }[]
+  rules: ProfileRule[]
+}
+
+export interface TableProfile {
+  rows: number
+  column_count: number
+  key: string | null
+  complete_rows: number
+  duplicate_rows: number
+  filled_share: number
+  rules_checked: number
+  rules_failed: number
+  score: number
+  columns: ColumnProfile[]
+}
+
+export interface RawTableProfile extends RawTable {
+  column_names: string[]
+  profile: TableProfile | Record<string, never>
+}
+
+export interface TableLink {
+  table: string
+  column: string
+  to_table: string
+  to_column: string
+  checked: number
+  matched: number
+  missing: number
+  share: number
 }

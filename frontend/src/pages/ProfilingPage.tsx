@@ -1,11 +1,12 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type { ProfileCheck } from '../api/types'
 import { useApi } from '../api/useApi'
 import { Icon } from '../components/Icon'
 import { Loader } from '../components/Loader'
+import { QualityRing } from '../components/QualityRing'
 import { SourceTables } from '../components/SourceTables'
 import { Card, EmptyState, ErrorAlert, PageHeader } from '../components/ui'
 
@@ -52,10 +53,6 @@ function needsAttention(check: ProfileCheck) {
   return check.values.filter((v) => ['bad', 'fix', 'empty'].includes(toneOf(v.value))).reduce((n, v) => n + v.count, 0)
 }
 
-function scoreTone(score: number): 'good' | 'fix' | 'bad' {
-  return score >= 85 ? 'good' : score >= 60 ? 'fix' : 'bad'
-}
-
 type Column = { name: string; checks: ProfileCheck[]; score: number; issues: number }
 
 const SHOWN: { field: 'name' | 'mobile' | 'pan' | 'email' | 'dob' | 'gender' | 'country' | 'residency'; label: string }[] = [
@@ -74,7 +71,9 @@ type View = 'tables' | 'fields'
 // Data profiling. Source tables: every table of a connector, read whole as the system holds it (the raw layer).
 // Customer fields: the checks on the columns each connector maps to Lumina's customer fields.
 export function ProfilingPage() {
-  const [view, setView] = useState<View>('tables')
+  const [params, setParams] = useSearchParams()
+  const view: View = params.get('view') === 'fields' ? 'fields' : 'tables'
+  const setView = (next: View) => setParams({ view: next })
   const switcher = (
     <div className="segmented" role="group" aria-label="Profile by">
       <button type="button" aria-pressed={view === 'tables'} onClick={() => setView('tables')}>
@@ -295,36 +294,6 @@ function CustomerFieldsProfile({ switcher }: { switcher: ReactNode }) {
         />
       )}
     </>
-  )
-}
-
-// A ring that fills with the clean share, coloured by how healthy it is; the number sits inside.
-function QualityRing({ score, size }: { score: number; size: number }) {
-  const stroke = size > 80 ? 10 : 6
-  const radius = (size - stroke) / 2
-  const length = 2 * Math.PI * radius
-  const tone = scoreTone(score)
-  return (
-    <span className="dq-ring" style={{ width: size, height: size }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
-        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" className="dq-ring-track" strokeWidth={stroke} />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          className={`dq-ring-value is-${tone}`}
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={`${(length * Math.min(score, 100)) / 100} ${length}`}
-          transform={`rotate(-90 ${size / 2} ${size / 2})`}
-        />
-      </svg>
-      <span className={`dq-ring-label is-${tone}`} style={{ fontSize: size > 80 ? 30 : 14 }}>
-        {Math.round(score)}
-        <small>%</small>
-      </span>
-    </span>
   )
 }
 
