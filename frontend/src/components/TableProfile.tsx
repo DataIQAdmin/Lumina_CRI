@@ -241,7 +241,9 @@ function IssueList({ issues, onOpen }: { issues: Issue[]; onOpen: (d: Drill) => 
               type="button"
               className="raw-issue"
               disabled={!i.failed}
-              onClick={() => onOpen({ column: i.column, rule: i.rule, label: `${i.column}: ${i.label}` })}
+              onClick={() =>
+                onOpen({ column: i.column, rule: i.rule, label: `${i.column}: ${problemLabel(i.rule, i.label)}` })
+              }
             >
               <i className={`dq-dot is-${tone(failedShare)}`} aria-hidden="true" />
               <span className="raw-issue-text">
