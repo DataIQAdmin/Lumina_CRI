@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
 
 import { api } from '../api/client'
-import type { ColumnProfile, RawTable, TableLink, TableProfile } from '../api/types'
+import type { ColumnProfile, ProfileRule, RawTable, TableLink, TableProfile } from '../api/types'
 import { useApi } from '../api/useApi'
-import { formatDateTime } from '../format'
+import { formatDate, formatDateTime } from '../format'
 import { Icon } from './Icon'
 import { Loader } from './Loader'
 import { QualityRing } from './QualityRing'
@@ -14,7 +14,7 @@ export type TableTab = 'overview' | 'columns' | 'issues' | 'links' | 'rows'
 export const TABLE_TABS: { value: TableTab; label: string }[] = [
   { value: 'overview', label: 'Overview' },
   { value: 'columns', label: 'Columns' },
-  { value: 'issues', label: 'Issues' },
+  { value: 'issues', label: 'Problems' },
   { value: 'links', label: 'Relationships' },
   { value: 'rows', label: 'Rows' },
 ]
@@ -245,7 +245,8 @@ function IssueList({ issues, onOpen }: { issues: Issue[]; onOpen: (d: Drill) => 
             >
               <i className={`dq-dot is-${tone(failedShare)}`} aria-hidden="true" />
               <span className="raw-issue-text">
-                <strong>{i.column}</strong> <span className="muted">{i.label}</span>
+                <strong>{i.column}</strong>{' '}
+                <span className="muted">{i.failed ? problemLabel(i.rule, i.label) : i.label}</span>
               </span>
               <span className="dq-meter raw-issue-meter" aria-hidden="true">
                 <i
@@ -279,17 +280,21 @@ function Issues({ profile, onOpen }: { profile: TableProfile; onOpen: (d: Drill)
   return (
     <Card
       flush
-      title="Rules"
-      description={`${broken.length} of ${all.length} rules broken. Click one to see the rows.`}
+      title="Problems"
+      description={
+        broken.length
+          ? `${broken.length} problem${broken.length === 1 ? '' : 's'} found. Click one to see the rows.`
+          : 'No problems found.'
+      }
       actions={
         <label className="row text-sm" style={{ gap: 6 }}>
-          <input type="checkbox" checked={showPassed} onChange={(e) => setShowPassed(e.target.checked)} /> Show rules
+          <input type="checkbox" checked={showPassed} onChange={(e) => setShowPassed(e.target.checked)} /> Show checks
           that pass
         </label>
       }
     >
       {shown.length === 0 ? (
-        <EmptyState icon="check" title="No rule is broken" />
+        <EmptyState icon="check" title="No problems found" />
       ) : (
         <IssueList issues={shown} onOpen={onOpen} />
       )}
@@ -297,30 +302,83 @@ function Issues({ profile, onOpen }: { profile: TableProfile; onOpen: (d: Drill)
   )
 }
 
+// The Columns tab in plain words: what each column holds, how full it is and whether anything is wrong.
+const HOLDS: Record<string, string> = {
+  boolean: 'Yes / no',
+  integer: 'Whole numbers',
+  decimal: 'Numbers',
+  percent: 'Percentages',
+  scientific: 'Numbers like 4.05E+11',
+  date: 'Dates',
+  email: 'Email addresses',
+  uuid: 'IDs',
+  text: 'Text',
+  empty: 'Nothing',
+}
+
+// One sentence per broken rule, with the number of rows in front.
+const PROBLEM: Record<string, (count: string, c: ColumnProfile) => string> = {
+  unique: (k) => `${k} rows share their ID with another row`,
+  once: (k) => `${k} rows share this number with another row`,
+  email: (k) => `${k} email addresses are not valid`,
+  phone: (k) => `${k} numbers are not valid Indian mobile numbers`,
+  pincode: (k) => `${k} PIN codes do not have 6 digits`,
+  pan: (k) => `${k} PANs do not follow the PAN pattern (ABCDE1234F)`,
+  aadhaar_excel: (k) => `${k} Aadhaar numbers were damaged by Excel (saved like 4.05E+11)`,
+  aadhaar: (k) => `${k} Aadhaar numbers do not have 12 digits`,
+  date: (k) => `${k} dates are not real dates (like 31-02-2020)`,
+  age: (k) => `${k} people are under 18 or over 100 years old`,
+  formats: (k) => `${k} dates are written in a different format from the rest`,
+  spaces: (k) => `${k} values have extra spaces`,
+  type: (k, c) => `${k} values are not ${(HOLDS[c.type] ?? 'the same kind').toLowerCase()}`,
+  filled: () => 'This column is always empty',
+}
+
+function problemText(rule: ProfileRule, c: ColumnProfile) {
+  const make = PROBLEM[rule.key]
+  return make ? make(n(rule.failed), c) : `${n(rule.failed)} rows break: ${rule.label}`
+}
+
+// The same sentence without the number, for lists that show the number in their own column.
+function problemLabel(key: string, fallback: string) {
+  if (key === 'type') return 'values of a different kind'
+  const make = PROBLEM[key]
+  const text = make ? make('', {} as ColumnProfile).trim() : fallback
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
+function formatEnd(value: number | string | undefined, type: string) {
+  if (value === undefined) return ''
+  if (type === 'date') return formatDate(String(value))
+  return typeof value === 'number' ? value.toLocaleString('en-IN') : value
+}
+
 function Columns({ profile, onOpen }: { profile: TableProfile; onOpen: (d: Drill) => void }) {
   const [open, setOpen] = useState<string | null>(null)
+  const problems = profile.columns.filter((c) => c.rules.some((r) => r.failed)).length
   return (
-    <Card flush title="Columns" description="Click a column for its values, patterns and rules.">
+    <Card
+      flush
+      title="Columns"
+      description={`${profile.columns.length} columns · ${problems ? `${problems} with problems` : 'no problems found'}. Click a column to see more.`}
+    >
       <div className="table-wrap">
         <table className="table raw-columns">
           <thead>
             <tr>
               <th>Column</th>
-              <th>Type</th>
-              <th className="num">Empty</th>
-              <th className="num">Different values</th>
-              <th className="num">Issues</th>
+              <th>Holds</th>
+              <th>Filled</th>
+              <th>Status</th>
             </tr>
           </thead>
           <tbody>
             {profile.columns.map((c) => {
-              const broken = c.rules.filter((r) => r.failed).length
               const isOpen = open === c.name
               return (
                 <ColumnRows
                   key={c.name}
                   column={c}
-                  broken={broken}
                   isOpen={isOpen}
                   onToggle={() => setOpen(isOpen ? null : c.name)}
                   onOpen={onOpen}
@@ -334,19 +392,36 @@ function Columns({ profile, onOpen }: { profile: TableProfile; onOpen: (d: Drill
   )
 }
 
+function ColumnStatus({ column: c }: { column: ColumnProfile }) {
+  const broken = c.rules.filter((r) => r.failed)
+  if (c.empty === c.rows && c.rows > 0) return <span className="col-status is-empty">Always empty</span>
+  if (!broken.length) {
+    return (
+      <span className="col-status is-good">
+        <Icon name="check" size={13} /> Looks good
+      </span>
+    )
+  }
+  return (
+    <span className="col-status is-bad">
+      <Icon name="alert" size={13} /> {broken.length} problem{broken.length === 1 ? '' : 's'}
+    </span>
+  )
+}
+
 function ColumnRows({
   column: c,
-  broken,
   isOpen,
   onToggle,
   onOpen,
 }: {
   column: ColumnProfile
-  broken: number
   isOpen: boolean
   onToggle: () => void
   onOpen: (d: Drill) => void
 }) {
+  const filled = c.rows - c.empty
+  const filledShare = pct(filled, c.rows)
   return (
     <>
       <tr className={`raw-table-row${isOpen ? ' is-on' : ''}`} onClick={onToggle}>
@@ -355,18 +430,27 @@ function ColumnRows({
             {c.name}
           </button>
           {c.key && <span className="badge">ID</span>}
-          {c.identity && <Icon name="lock" size={12} className="raw-lock" label="Identity number, masked" />}
+          {c.identity && <Icon name="lock" size={12} className="raw-lock" label="Identity number, kept hidden" />}
         </td>
-        <td className="text-sm">{c.type_label}</td>
-        <td className="num">{c.empty ? share(c.empty, c.rows) : <span className="muted">0</span>}</td>
-        <td className="num">{n(c.distinct)}</td>
-        <td className="num">
-          {broken ? <strong className="raw-score is-bad">{broken}</strong> : <span className="muted">0</span>}
+        <td className="text-sm">{c.key ? 'IDs' : c.identity ? 'Identity numbers' : (HOLDS[c.type] ?? c.type_label)}</td>
+        <td>
+          <span className="col-filled">
+            <span className="dq-meter" aria-hidden="true">
+              <i
+                className={`is-${filledShare === 100 ? 'good' : filledShare >= 80 ? 'fix' : 'bad'}`}
+                style={{ width: `${filledShare}%` }}
+              />
+            </span>
+            <span className="num text-sm">{share(filled, c.rows)}</span>
+          </span>
+        </td>
+        <td>
+          <ColumnStatus column={c} />
         </td>
       </tr>
       {isOpen && (
         <tr className="raw-column-detail">
-          <td colSpan={5}>
+          <td colSpan={4}>
             <ColumnDetail column={c} onOpen={onOpen} />
           </td>
         </tr>
@@ -375,81 +459,86 @@ function ColumnRows({
   )
 }
 
-function ValueBars({
-  title,
-  items,
-  total,
-}: {
-  title: string
-  items: { value: string; count: number }[]
-  total: number
-}) {
-  if (!items.length) return null
-  return (
-    <div className="stack" style={{ gap: 6 }}>
-      <span className="dq-eyebrow">{title}</span>
-      <ul className="raw-values">
-        {items.map((v) => (
-          <li key={v.value}>
-            <code title={v.value}>{v.value}</code>
-            <span className="dq-meter" aria-hidden="true">
-              <i className="is-good" style={{ width: `${pct(v.count, total)}%` }} />
-            </span>
-            <span className="num text-sm">{n(v.count)}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
+// Plain sentences about one column, then its problems (each opens the rows), then its most common values.
 function ColumnDetail({ column: c, onOpen }: { column: ColumnProfile; onOpen: (d: Drill) => void }) {
   const filled = c.rows - c.empty
-  const facts: [string, string][] = [
-    ['Filled', `${n(filled)} of ${n(c.rows)} (${share(filled, c.rows)})`],
-    ['Different values', `${n(c.distinct)}${c.distinct === filled && filled > 0 ? ' · every value different' : ''}`],
-    [
-      'Length',
-      c.min_length === null
-        ? '—'
-        : c.min_length === c.max_length
-          ? `${c.min_length}`
-          : `${c.min_length} to ${c.max_length}`,
-    ],
-  ]
-  if (c.min !== undefined) facts.push(['Smallest · largest', `${c.min} · ${c.max}`])
-  if (c.types.length > 1) facts.push(['Kinds of value', c.types.map((t) => `${t.label} ${n(t.count)}`).join(', ')])
-  if (c.date_formats?.length)
-    facts.push(['Date formats', c.date_formats.map((f) => `${f.format} ${n(f.count)}`).join(', ')])
+  const broken = c.rules.filter((r) => r.failed)
+  const facts: string[] = []
+  facts.push(
+    c.empty === 0
+      ? 'Every row has a value.'
+      : filled === 0
+        ? 'Every row is empty.'
+        : `${n(c.empty)} rows (${share(c.empty, c.rows)}) are empty.`,
+  )
+  if (c.identity) {
+    facts.push('Identity number: Lumina keeps it hidden and checks only its shape.')
+  } else if (filled > 0) {
+    if (c.distinct === filled) facts.push('Every value is different.')
+    else if (c.distinct === 1) facts.push(`Every filled row has the same value: ${c.top[0]?.value ?? 'hidden'}.`)
+    else if (c.distinct <= 6 && c.top.length)
+      facts.push(`Only ${c.distinct} different values: ${c.top.map((t) => t.value).join(', ')}.`)
+    else facts.push(`${n(c.distinct)} different values.`)
+  }
+  if (c.min !== undefined && c.max !== undefined) {
+    const what = c.type === 'date' ? 'Dates' : 'Values'
+    facts.push(`${what} from ${formatEnd(c.min, c.type)} to ${formatEnd(c.max, c.type)}.`)
+  }
+  const formats = c.date_formats ?? []
+  if (formats.length === 1) facts.push(`All dates are written as ${formats[0].format}.`)
+  if (formats.length > 1)
+    facts.push(`Dates are written in ${formats.length} ways: ${formats.map((f) => f.format).join(', ')}.`)
+
   return (
-    <div className="raw-column-grid">
-      <dl className="raw-facts raw-facts-compact">
-        {facts.map(([k, v]) => (
-          <div key={k}>
-            <dt>{k}</dt>
-            <dd>{v}</dd>
-          </div>
+    <div className="col-detail">
+      <ul className="col-facts">
+        {facts.map((f) => (
+          <li key={f}>{f}</li>
         ))}
-      </dl>
-      {c.identity ? (
-        <p className="text-sm muted">Identity number: only patterns are kept, never the numbers.</p>
-      ) : (
-        <ValueBars title="Most common values" items={c.top} total={filled} />
-      )}
-      <ValueBars title={`Patterns (${n(c.pattern_count)})`} items={c.patterns} total={filled} />
-      {c.rules.length > 0 && (
-        <div className="stack raw-column-rules" style={{ gap: 6 }}>
-          <span className="dq-eyebrow">Rules</span>
-          <IssueList
-            issues={c.rules.map((r) => ({
-              column: c.name,
-              rule: r.key,
-              label: r.label,
-              checked: r.checked,
-              failed: r.failed,
-            }))}
-            onOpen={onOpen}
-          />
+      </ul>
+
+      <div className="stack" style={{ gap: 8 }}>
+        <span className="dq-eyebrow">{broken.length ? 'Problems found' : 'Checks'}</span>
+        {broken.length === 0 ? (
+          <p className="col-ok">
+            <Icon name="check" size={14} /> No problems found
+          </p>
+        ) : (
+          <ul className="col-problems">
+            {broken.map((r) => (
+              <li key={r.key}>
+                <Icon name="alert" size={14} className="col-problem-icon" />
+                <span>{problemText(r, c)}</span>
+                {r.key !== 'filled' && (
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => onOpen({ column: c.name, rule: r.key, label: `${c.name}: ${problemText(r, c)}` })}
+                  >
+                    See rows
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Common values only help when values repeat; for dates of birth or names each is under 0.1%. */}
+      {!c.identity && c.top.length > 0 && pct(c.top[0].count, filled) >= 1 && (
+        <div className="stack" style={{ gap: 8 }}>
+          <span className="dq-eyebrow">Most common values</span>
+          <ul className="raw-values">
+            {c.top.map((v) => (
+              <li key={v.value}>
+                <code title={v.value}>{v.value}</code>
+                <span className="dq-meter" aria-hidden="true">
+                  <i className="is-good" style={{ width: `${pct(v.count, filled)}%` }} />
+                </span>
+                <span className="num text-sm">{share(v.count, filled)}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>
