@@ -1,4 +1,5 @@
 import { createContext, useContext } from 'react'
+import { fetchWhileWaking } from './api/client'
 
 // Which organization (bank) this page belongs to, read from the address: /t/axis/... is Axis Bank.
 // One page load serves one organization; switching organization is a full page load, so nothing from one
@@ -23,7 +24,8 @@ export async function lookupOrganization(code: string): Promise<Organization> {
   if (!/^[a-z0-9-]+$/.test(clean)) {
     throw new Error('Use the short code your administrator gave you, for example "axis".')
   }
-  const response = await fetch(`/api/organizations/${clean}/`, { headers: { Accept: 'application/json' } })
+  // Waits while the sleeping demo server starts, like every other request.
+  const response = await fetchWhileWaking(`/api/organizations/${clean}/`, { headers: { Accept: 'application/json' } })
   const data = await response.json().catch(() => ({}))
   if (!response.ok) {
     throw new Error(data.detail ?? 'Could not check that organization. Please try again.')
