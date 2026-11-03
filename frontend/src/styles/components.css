@@ -4799,3 +4799,90 @@ button.link {
 .raw-preview td.silver-cell.is-emptied {
   background: color-mix(in srgb, var(--warn-dot) 16%, transparent);
 }
+
+/* Columns tab in plain words (TableProfile.tsx) */
+.col-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.col-status.is-good {
+  color: var(--good-text);
+}
+
+.col-status.is-bad {
+  color: var(--bad-text);
+}
+
+.col-status.is-empty {
+  color: var(--text-3);
+}
+
+.col-filled {
+  display: grid;
+  grid-template-columns: minmax(60px, 120px) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.col-detail {
+  display: grid;
+  gap: 18px;
+  max-width: 820px;
+}
+
+.col-facts {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+  font-size: var(--text-sm);
+}
+
+.col-ok {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--good-text);
+}
+
+.col-problems {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.col-problems li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--text-sm);
+}
+
+.col-problem-icon {
+  color: var(--bad-text);
+}
+
+.col-detail .raw-values li {
+  max-width: 520px;
+}
+
+/* The column name cell stays a table cell, so its row border lines up with the others. */
+.raw-columns .raw-table-row td:first-child {
+  display: table-cell;
+}
+
+.raw-columns .raw-table-row td:first-child .badge,
+.raw-columns .raw-table-row td:first-child .raw-lock {
+  margin-left: 8px;
+}
