@@ -84,7 +84,7 @@ export const serverWaking = {
   },
 }
 
-async function fetchWhileWaking(url: string, init: RequestInit): Promise<Response> {
+export async function fetchWhileWaking(url: string, init: RequestInit): Promise<Response> {
   const started = Date.now()
   for (;;) {
     let response: Response | null = null
