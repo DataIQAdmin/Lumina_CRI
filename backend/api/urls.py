@@ -25,6 +25,7 @@ urlpatterns = [
     path("rules/<slug:code>/remove/", rule_views.remove),
     path("regex/check/", rule_views.check),
     path("regex/library/", rule_views.library),
+    path("regex/library/<int:pk>/", rule_views.library_item),
     path("regex/test/", rule_views.test),
     path("silver/<slug:code>/", rule_views.silver_tables),
     path("silver/<slug:code>/rows/", rule_views.silver_rows),

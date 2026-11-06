@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 
 import { api } from '../api/client'
-import type { RegexCheck, RulePreview } from '../api/types'
+import type { ReadyRegex, RegexCheck, RegexLibrary, RulePreview } from '../api/types'
 import { useApi } from '../api/useApi'
 import { ConnectorPicker } from '../components/ConnectorPicker'
 import { Icon } from '../components/Icon'
@@ -48,7 +48,7 @@ export function RulesPage() {
     <>
       <PageHeader
         title="Rules"
-        description="Write a regular expression for a column, preview it, then apply it. Rows that pass go to silver."
+        description="Pick or write a regular expression for a column, preview it, then apply it. Rows that pass go to silver."
       />
       {sources.error && <ErrorAlert message={sources.error} />}
       {!sources.data && !sources.error && (
@@ -73,10 +73,76 @@ export function RulesPage() {
   )
 }
 
+// The ready-made regexes that fit a column name: "AlternatePhoneNumber" has the words alternate, phone, number.
+function suggested(column: string, ready: ReadyRegex[]) {
+  const words = column
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+  return ready.filter((r) => r.hints.some((hint) => words.includes(hint)))
+}
+
+function LibraryPicker({
+  library,
+  column,
+  onPick,
+}: {
+  library: RegexLibrary | null
+  column: string
+  onPick: (pattern: string) => void
+}) {
+  if (!library) return null
+  const fits = suggested(column, library.ready)
+  return (
+    <label className="regex-pick">
+      <span className="text-sm muted">Choose from the library</span>
+      <select
+        className="select"
+        value=""
+        onChange={(e) => {
+          if (e.target.value) onPick(e.target.value)
+        }}
+      >
+        <option value="">Pick a regex, or type your own below</option>
+        {fits.length > 0 && (
+          <optgroup label="Suggested for this column">
+            {fits.map((r) => (
+              <option key={r.pattern} value={r.pattern}>
+                {r.name}
+              </option>
+            ))}
+          </optgroup>
+        )}
+        {library.saved.length > 0 && (
+          <optgroup label="Saved by your team">
+            {library.saved.map((r) => (
+              <option key={r.id} value={r.pattern}>
+                {r.name}
+              </option>
+            ))}
+          </optgroup>
+        )}
+        <optgroup label="All ready-made">
+          {library.ready.map((r) => (
+            <option key={r.pattern} value={r.pattern}>
+              {r.name}
+            </option>
+          ))}
+        </optgroup>
+      </select>
+    </label>
+  )
+}
+
 function TableRules({ code }: { code: string }) {
   const tables = useApi(() => api.rawTables(code), [code])
   const [params, setParams] = useSearchParams()
   const names = (tables.data?.tables ?? []).map((t) => t.name)
+  // A regex brought from the library stays while people choose where to use it.
+  const place = (source: string, table: string) => {
+    const regex = params.get('regex')
+    return { source, table, ...(regex ? { regex } : {}) }
+  }
   const table = names.find((name) => name === params.get('table')) ?? names[0]
 
   if (tables.error) return <ErrorAlert message={tables.error} />
@@ -88,7 +154,7 @@ function TableRules({ code }: { code: string }) {
         <select
           className="select"
           value={table}
-          onChange={(e) => setParams({ source: code, table: e.target.value })}
+          onChange={(e) => setParams(place(code, e.target.value))}
         >
           {names.map((name) => (
             <option key={name}>{name}</option>
@@ -102,6 +168,7 @@ function TableRules({ code }: { code: string }) {
 
 function Columns({ code, table }: { code: string; table: string }) {
   const columns = useApi(() => api.ruleColumns(code, table), [code, table])
+  const library = useApi(() => api.regexLibrary(), [])
   const [params, setParams] = useSearchParams()
   const list = columns.data?.columns ?? []
   const open = list.find((c) => c.name === params.get('column')) ?? list[0]
@@ -115,7 +182,7 @@ function Columns({ code, table }: { code: string; table: string }) {
       </div>
     )
   }
-  const pick = (column: string) => setParams({ source: code, table, column })
+  const pick = (column: string) => setParams({ source: code, table, column, ...(typed ? { regex: typed } : {}) })
   return (
     <div className="rule-layout">
       <Card flush title="Columns" description={`${list.filter((c) => c.pattern).length} of ${list.length} have a rule`}>
@@ -136,12 +203,13 @@ function Columns({ code, table }: { code: string; table: string }) {
         </ul>
       </Card>
       <RuleEditor
-        key={`${open.name}:${open.pattern}`}
+        key={`${open.name}:${open.pattern}:${typed}`}
         code={code}
         table={table}
         column={open.name}
         applied={open.pattern}
-        start={(open.name === params.get('column') && typed) || open.pattern}
+        start={typed || open.pattern}
+        library={library.data}
         onChanged={columns.reload}
       />
     </div>
@@ -154,6 +222,7 @@ function RuleEditor({
   column,
   applied,
   start,
+  library,
   onChanged,
 }: {
   code: string
@@ -161,6 +230,7 @@ function RuleEditor({
   column: string
   applied: string
   start: string
+  library: RegexLibrary | null
   onChanged: () => void
 }) {
   const toast = useToast()
@@ -200,6 +270,7 @@ function RuleEditor({
   return (
     <Card title={column} description="The whole value must match. Empty values fail unless your regex allows them.">
       <div className="stack" style={{ gap: 12 }}>
+        <LibraryPicker library={library} column={column} onPick={setPattern} />
         <input
           className="input regex-input"
           aria-label={`Regular expression for ${column}`}

@@ -10,6 +10,7 @@ from ingestion.bronze import profile_column
 from ingestion.clean_start import clean_start
 from ingestion.fake_people import fake_table
 from ingestion.models import ColumnRule, RawRow, RawTable
+from ingestion.regex_library import READY_REGEXES
 from ingestion.rules import RuleError, compile_rule
 from sources.models import Source
 
@@ -190,3 +191,31 @@ def test_fake_people_are_stable_and_some_are_wrong_on_purpose():
     pans = [r[3] for r in once if r[3]]
     assert sum(p.isupper() and len(p) == 10 and p[3] == "P" for p in pans) > len(pans) * 0.8
     assert any("@" not in r[5] for r in once) and any(len(r[5]) > 50 for r in once)
+
+
+def test_columns_with_few_values_count_each_value():
+    values = ["Office"] * 15 + ["Home"] * 10
+    assert profile_column("PhoneType", values)["values"] == [{"label": "Office", "count": 15},
+                                                             {"label": "Home", "count": 10}]
+    assert profile_column("PAN", values)["values"] == []  # identity numbers are never listed
+    assert profile_column("PhoneType", ["Office"] * 5)["values"] == []  # too few rows: could point at one person
+    assert profile_column("City", [f"City {i}" for i in range(30)])["values"] == []
+
+
+def test_ready_regexes_are_proper_and_match_their_examples():
+    assert len({r["pattern"] for r in READY_REGEXES}) == len(READY_REGEXES)
+    for ready in READY_REGEXES:
+        assert compile_rule(ready["pattern"]).fullmatch(ready["example"]), ready["name"]
+
+
+def test_library_keeps_saved_regexes(admin, db):
+    assert any(r["name"] == "PAN" for r in admin.get("/api/regex/library/").json()["ready"])
+    made = admin.post("/api/regex/library/", {"name": "Branch code", "pattern": r"^BR[0-9]{4}$"}, format="json")
+    assert made.status_code == 201
+    again = admin.post("/api/regex/library/", {"name": "Branch", "pattern": r"^BR[0-9]{4}$"}, format="json")
+    assert again.json()["id"] == made.json()["id"]
+    assert [r["name"] for r in admin.get("/api/regex/library/").json()["saved"]] == ["Branch"]
+    assert admin.post("/api/regex/library/", {"name": "Bad", "pattern": "([0-9"}, format="json").status_code == 400
+    assert admin.post("/api/regex/library/", {"name": " ", "pattern": r"\d"}, format="json").status_code == 400
+    assert admin.delete(f"/api/regex/library/{made.json()['id']}/").status_code == 204
+    assert admin.get("/api/regex/library/").json()["saved"] == []

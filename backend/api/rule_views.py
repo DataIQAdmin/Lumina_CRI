@@ -1,8 +1,9 @@
 """Rules, the regex library and the silver layer API (ingestion/rules.py).
 
-Rules: type a regex for a column, preview it on 10 rows, then apply it. Silver: the rows that pass every applied
-rule of their table; the others stay in rejected. Regex library: the regexes in use, and a tester that tries one on
-every column so people can see where it fits. Stewards and admins only; rows also need view_pii.
+Rules: type or pick a regex for a column, preview it on 10 rows, then apply it. Silver: the rows that pass every
+applied rule of their table; the others stay in rejected. Regex library: ready-made and saved regexes to pick on
+Rules, and a tester that tries one on every column so people can see where it fits. Stewards and admins only; rows
+also need view_pii.
 """
 
 from rest_framework import status
@@ -11,7 +12,8 @@ from rest_framework.response import Response
 
 from audit.models import AuditEvent
 from audit.services import record
-from ingestion.models import ColumnRule, RawTable
+from ingestion.models import ColumnRule, RawTable, SavedRegex
+from ingestion.regex_library import READY_REGEXES
 from ingestion.rules import RuleError, compile_rule, split, table_rules
 from ingestion.rules import preview as preview_rule
 from ingestion.rules import test_table as test_rule
@@ -108,17 +110,44 @@ def check(request):
     return Response({"valid": True, "error": ""})
 
 
-@api_view(["GET"])
+def _saved_json(r):
+    return {"id": r.id, "name": r.name, "pattern": r.pattern}
+
+
+@api_view(["GET", "POST"])
 @permission_classes(RULES)
 def library(request):
-    """GET /api/regex/library/  Every regex in use with where it is used, and every profiled table to test on."""
+    """GET /api/regex/library/  Ready-made and saved regexes, every regex in use with where it is used, and every
+    profiled table to test on.
+    POST {name, pattern}  Keep a regex in the library. Saving the same regex again renames it."""
+    if request.method == "POST":
+        name = str(request.data.get("name") or "").strip()[:80]
+        pattern = str(request.data.get("pattern") or "")
+        if not name:
+            return _bad("Give this regex a name.")
+        try:
+            compile_rule(pattern)
+        except RuleError as exc:
+            return _bad(str(exc))
+        saved, _ = SavedRegex.objects.update_or_create(pattern=pattern, defaults={
+            "name": name, "saved_by": request.user.username})
+        return Response(_saved_json(saved), status=status.HTTP_201_CREATED)
     patterns = {}
     for r in ColumnRule.objects.select_related("source"):
         patterns.setdefault(r.pattern, []).append({"code": r.source.code, "source": r.source.name, "table": r.table,
                                                    "column": r.column})
     tables = [{"code": t.source.code, "source": t.source.name, "table": t.name}
               for t in RawTable.objects.select_related("source").order_by("source__name", "name")]
-    return Response({"patterns": [{"pattern": p, "used": used} for p, used in patterns.items()], "tables": tables})
+    return Response({"ready": READY_REGEXES, "saved": [_saved_json(r) for r in SavedRegex.objects.all()],
+                     "patterns": [{"pattern": p, "used": used} for p, used in patterns.items()], "tables": tables})
+
+
+@api_view(["DELETE"])
+@permission_classes(RULES)
+def library_item(request, pk):
+    """DELETE /api/regex/library/<id>/  Remove a saved regex. Rules already using it stay as they are."""
+    SavedRegex.objects.filter(pk=pk).delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @api_view(["POST"])

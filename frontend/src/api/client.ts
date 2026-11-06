@@ -38,6 +38,7 @@ import type {
   RegexLibrary,
   RuleColumns,
   RulePreview,
+  SavedRegex,
   SilverRows,
   SilverTable,
   User,
@@ -237,6 +238,8 @@ export const api = {
     post<{ removed: number }>(`/rules/${code}/remove/`, { table, column }),
   regexCheck: (pattern: string) => post<RegexCheck>('/regex/check/', { pattern }),
   regexLibrary: () => get<RegexLibrary>('/regex/library/'),
+  regexSave: (name: string, pattern: string) => post<SavedRegex>('/regex/library/', { name, pattern }),
+  regexDelete: (id: number) => request<void>('DELETE', `/regex/library/${id}/`),
   regexTest: (code: string, table: string, pattern: string) =>
     post<{ columns: { column: string; matched: number; filled: number }[] }>('/regex/test/', { code, table, pattern }),
   silverTables: (code: string) => get<{ code: string; name: string; tables: SilverTable[] }>(`/silver/${code}/`),
