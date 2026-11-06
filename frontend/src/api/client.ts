@@ -53,8 +53,8 @@ export class ApiError extends Error {
   }
 }
 
-// The hosted demo's free server sleeps after 15 minutes without visitors. While it starts again (up to a
-// minute) every request gets 502, 503 or 504, or no answer at all. Wait and retry instead of failing, and tell
+// The hosted demo's free server sleeps after 15 minutes without visitors. While it starts again (up to three
+// minutes) every request gets 502, 503 or 504, or no answer at all. Wait and retry instead of failing, and tell
 // the screen so it can say what is happening. While it restarts, the host also answers 429 with its own page
 // (not JSON); Lumina's own 429 (too many sign-in attempts) is JSON and is not retried.
 const WAKING_STATUSES = [502, 503, 504]
@@ -63,7 +63,7 @@ function isWaking(response: Response) {
   if (WAKING_STATUSES.includes(response.status)) return true
   return response.status === 429 && !(response.headers.get('content-type') ?? '').includes('application/json')
 }
-const WAKING_LIMIT_MS = 90_000
+const WAKING_LIMIT_MS = 180_000
 const WAKING_RETRY_MS = 5_000
 
 let waking = false
