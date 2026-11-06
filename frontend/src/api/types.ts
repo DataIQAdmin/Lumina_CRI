@@ -570,6 +570,7 @@ export interface ColumnCounts {
   empty: number
   unique: number
   counts: { label: string; count: number }[]
+  values?: { label: string; count: number }[] // absent on tables profiled before value counts existed
 }
 
 export interface RawTableProfile extends RawTable {
@@ -595,7 +596,22 @@ export interface RulePreview {
   sample: { position: number; value: unknown; passed: boolean }[]
 }
 
+export interface ReadyRegex {
+  name: string
+  pattern: string
+  example: string
+  hints: string[]
+}
+
+export interface SavedRegex {
+  id: number
+  name: string
+  pattern: string
+}
+
 export interface RegexLibrary {
+  ready: ReadyRegex[]
+  saved: SavedRegex[]
   patterns: { pattern: string; used: { code: string; source: string; table: string; column: string }[] }[]
   tables: { code: string; source: string; table: string }[]
 }

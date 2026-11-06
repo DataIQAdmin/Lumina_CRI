@@ -4,13 +4,14 @@ Every column shows how many values are filled, empty and unique. On top of that:
 - number-like columns (phone, Aadhaar, PAN, pincode, IDs) show how many values have each length,
   e.g. phone: 10 digits 430, 9 digits 40, 7 digits 30;
 - email columns show how many stay within EMAIL_LIMIT characters and how many go over it;
-- free text such as names has no length count: a name can be any length.
+- free text such as names has no length count: a name can be any length;
+- columns with only a few different values (PhoneType, Gender) count each value. Identity numbers never do.
 """
 
 import re
 from collections import Counter
 
-from .raw import _words
+from .raw import _words, is_identity
 
 EMAIL_LIMIT = 50
 MOST_LENGTHS = 6  # lengths listed per column; the rest are added up as "Other lengths"
@@ -21,6 +22,8 @@ COUNTED_WORDS = {"id", "no", "number", "num", "code", "phone", "mobile", "contac
 NOT_COUNTED_WORDS = {"type", "flag", "status", "provider", "time", "date", "score", "frequency", "category",
                      "preference", "method", "name", "timestamp"}
 NUMBER_MARKS = re.compile(r"[\s+()-]")
+FEW_VALUES = 8  # a column with this many different values or fewer shows a count for each
+ENOUGH_ROWS = 20  # below this a value could point at one person, so values are not listed
 
 
 def _text(value):
@@ -57,10 +60,20 @@ def _counts(column, filled):
     return out + ([{"label": "Other lengths", "count": rest}] if rest else [])
 
 
+def _values(column, filled):
+    """[{label, count}] of each value for a column with few of them, most common first."""
+    if len(filled) < ENOUGH_ROWS or is_identity(column) or _is_email(filled):
+        return []
+    found = Counter(filled)
+    if len(found) > FEW_VALUES:
+        return []
+    return [{"label": label, "count": count} for label, count in found.most_common()]
+
+
 def profile_column(column, values):
     filled = [t for t in (_text(v) for v in values) if t]
     return {"name": column, "filled": len(filled), "empty": len(values) - len(filled), "unique": len(set(filled)),
-            "counts": _counts(column, filled)}
+            "counts": _counts(column, filled), "values": _values(column, filled)}
 
 
 def profile_table(columns, rows):

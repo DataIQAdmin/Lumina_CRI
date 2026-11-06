@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { api } from '../api/client'
@@ -19,18 +19,25 @@ interface Fit {
 }
 
 const percent = (f: Fit) => Math.round((100 * f.matched) / f.filled)
+const rulesLink = (pattern: string, place: Record<string, string> = {}) =>
+  `/rules?${new URLSearchParams({ ...place, regex: pattern })}`
 
-// Regex library: the regexes in use and where, and a tester that tries one on every column of every profiled
-// table, best fit first, so people can see where to use it. A chosen column opens on Rules for the usual preview.
+// Regex library: ready-made and saved regexes to use on Rules without writing them, a tester that tries one on every
+// column of every profiled table, best fit first, and the regexes already applied. Chosen regexes open on Rules for
+// the usual preview.
 export function RegexLibraryPage() {
   const toast = useToast()
   const library = useApi(() => api.regexLibrary(), [])
   const [pattern, setPattern] = useState('')
+  const [name, setName] = useState('')
   const check = useRegexCheck(pattern)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [fits, setFits] = useState<{ pattern: string; rows: Fit[] } | null>(null)
+  const top = useRef<HTMLDivElement>(null)
   const tables = library.data?.tables ?? []
   const patterns = library.data?.patterns ?? []
+  const saved = library.data?.saved ?? []
+  const ready = library.data?.ready ?? []
 
   const test = async () => {
     const rows: Fit[] = []
@@ -47,11 +54,39 @@ export function RegexLibraryPage() {
       setProgress(null)
     }
   }
+  const save = async () => {
+    try {
+      await api.regexSave(name, pattern)
+      toast('success', 'Saved to the library.')
+      setName('')
+      library.reload()
+    } catch (e) {
+      toast('error', (e as Error).message)
+    }
+  }
+  const remove = async (id: number) => {
+    try {
+      await api.regexDelete(id)
+      library.reload()
+    } catch (e) {
+      toast('error', (e as Error).message)
+    }
+  }
+  const tryIt = (next: string) => {
+    setPattern(next)
+    top.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
   const shown = fits?.rows.filter((f) => f.matched > 0) ?? []
+  const entries = [...saved.map((r) => ({ ...r, example: '' })), ...ready.map((r) => ({ ...r, id: 0 }))]
 
   return (
     <>
-      <PageHeader title="Regex library" description="Test a regular expression on all tables to see where it fits." />
+      <div ref={top} className="pick-results">
+        <PageHeader
+          title="Regex library"
+          description="Ready regular expressions to use on Rules, and a tester to see where each one fits."
+        />
+      </div>
       {library.error && <ErrorAlert message={library.error} />}
       <Card
         title="Test a regex"
@@ -61,13 +96,13 @@ export function RegexLibraryPage() {
           <input
             className="input regex-input"
             aria-label="Regular expression to test"
-            placeholder="^[A-Z]{5}[0-9]{4}[A-Z]$"
+            placeholder="Pick one below, or type your own"
             spellCheck={false}
             value={pattern}
             onChange={(e) => setPattern(e.target.value)}
           />
           <RegexVerdict check={check} />
-          <div className="row" style={{ gap: 8 }}>
+          <div className="regex-save">
             <button
               type="button"
               className="btn btn-primary"
@@ -75,6 +110,16 @@ export function RegexLibraryPage() {
               onClick={test}
             >
               <Icon name="search" size={14} /> Test on all tables
+            </button>
+            <input
+              className="input"
+              aria-label="Name for this regex"
+              placeholder="Name, to keep it in the library"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <button type="button" className="btn" disabled={!check?.valid || !name.trim()} onClick={save}>
+              Save to library
             </button>
           </div>
           {progress && (
@@ -127,12 +172,7 @@ export function RegexLibraryPage() {
                       <td>
                         <Link
                           className="btn btn-sm"
-                          to={`/rules?${new URLSearchParams({
-                            source: f.code,
-                            table: f.table,
-                            column: f.column,
-                            regex: fits.pattern,
-                          })}`}
+                          to={rulesLink(fits.pattern, { source: f.code, table: f.table, column: f.column })}
                         >
                           Use here
                         </Link>
@@ -146,18 +186,59 @@ export function RegexLibraryPage() {
         </Card>
       )}
 
-      <Card flush title="Regexes in use" description="Every regex applied so far, and where.">
-        {!library.data && !library.error && <Loader kind="scan" label="Loading" />}
-        {library.data && patterns.length === 0 && (
-          <EmptyState icon="sliders" title="No regex applied yet">
-            Apply one on <Link to="/rules">Rules</Link> and it will be kept here.
-          </EmptyState>
+      <Card flush title="Library" description="Test a regex above, or use it on Rules without writing it.">
+        {!library.data && !library.error && <Loader kind="scan" label="Loading the library" />}
+        {entries.length > 0 && (
+          <div className="table-wrap">
+            <table className="table regex-ready">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Regex</th>
+                  <th>Example</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {entries.map((r) => (
+                  <tr key={r.pattern}>
+                    <td>
+                      <strong>{r.name}</strong>
+                      {r.id > 0 && <small className="muted"> Saved</small>}
+                    </td>
+                    <td>
+                      <code>{r.pattern}</code>
+                    </td>
+                    <td className="text-sm muted">{r.example}</td>
+                    <td>
+                      <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
+                        <button type="button" className="btn btn-sm" onClick={() => tryIt(r.pattern)}>
+                          Test
+                        </button>
+                        <Link className="btn btn-sm" to={rulesLink(r.pattern)}>
+                          Use in Rules
+                        </Link>
+                        {r.id > 0 && (
+                          <button type="button" className="btn btn-sm" onClick={() => remove(r.id)}>
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-        {patterns.length > 0 && (
+      </Card>
+
+      {patterns.length > 0 && (
+        <Card flush title="Regexes in use" description="Every regex applied so far, and where.">
           <ul className="regex-list">
             {patterns.map((p) => (
               <li key={p.pattern}>
-                <button type="button" className="link" title="Put it in the tester" onClick={() => setPattern(p.pattern)}>
+                <button type="button" className="link" title="Put it in the tester" onClick={() => tryIt(p.pattern)}>
                   <code>{p.pattern}</code>
                 </button>
                 <span className="text-sm muted">
@@ -166,8 +247,8 @@ export function RegexLibraryPage() {
               </li>
             ))}
           </ul>
-        )}
-      </Card>
+        </Card>
+      )}
     </>
   )
 }

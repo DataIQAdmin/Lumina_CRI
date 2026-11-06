@@ -5067,3 +5067,125 @@ button.link {
     max-height: 220px;
   }
 }
+
+/* Bronze result: summary tiles, filter row and thin single-hue bars */
+.pick-tables {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.bronze-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.bronze-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.bronze-tile strong {
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.bronze-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+}
+
+.bronze-tools .pick-pills {
+  margin: 0;
+}
+
+.bronze-tools .input {
+  width: 220px;
+  max-width: 100%;
+}
+
+.bronze-bar {
+  display: block;
+  flex: 1;
+  min-width: 48px;
+  height: 6px;
+  border-radius: 4px;
+  background: var(--chart-track);
+  overflow: hidden;
+}
+
+.bronze-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--chart-1);
+}
+
+.bronze-filled {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 130px;
+}
+
+.bronze-inside {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 260px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.bronze-inside li {
+  display: grid;
+  grid-template-columns: 130px minmax(48px, 1fr) 48px;
+  align-items: center;
+  gap: 8px;
+}
+
+.bronze-inside li span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bronze-inside strong {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.regex-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.regex-save {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.regex-save .input {
+  flex: 1;
+  min-width: 200px;
+}
+
+.regex-ready code {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}

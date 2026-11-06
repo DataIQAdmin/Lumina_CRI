@@ -65,6 +65,7 @@ function ConnectorTables({ code, canRead, onProfiled }: { code: string; canRead:
   const [progress, setProgress] = useState<{ done: number; total: number; table: string } | null>(null)
   const [failed, setFailed] = useState<{ table: string; error: string }[]>([])
   const results = useRef<HTMLDivElement>(null)
+  const [changing, setChanging] = useState(false) // the table list folds away once something is profiled
 
   useEffect(() => {
     if (!canRead) return
@@ -108,6 +109,7 @@ function ConnectorTables({ code, canRead, onProfiled }: { code: string; canRead:
     setProgress(null)
     setFailed(problems)
     setTicked(new Set())
+    setChanging(false)
     const read = chosen.length - problems.length
     toast(problems.length ? 'error' : 'success', `Profiled ${read} of ${chosen.length} tables.`)
     profiled.reload()
@@ -116,14 +118,27 @@ function ConnectorTables({ code, canRead, onProfiled }: { code: string; canRead:
     setTimeout(() => results.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300)
   }
 
+  const folded = done.length > 0 && !changing && !progress && failed.length === 0
+
   return (
     <>
       <Card
         flush
-        title="Choose tables"
-        description={canRead ? 'Only the tables you tick are profiled.' : 'A data steward or administrator profiles tables.'}
+        title={folded ? `${done.length} of ${all.length} tables profiled` : 'Choose tables'}
+        description={
+          canRead
+            ? folded
+              ? 'Open the list to profile more tables.'
+              : 'Only the tables you tick are profiled.'
+            : 'A data steward or administrator profiles tables.'
+        }
         actions={
-          canRead && (
+          canRead &&
+          (folded ? (
+            <button type="button" className="btn btn-sm" onClick={() => setChanging(true)}>
+              Change tables
+            </button>
+          ) : (
             <div className="row" style={{ gap: 8 }}>
               <button
                 type="button"
@@ -142,7 +157,7 @@ function ConnectorTables({ code, canRead, onProfiled }: { code: string; canRead:
                 <Icon name="search" size={14} /> Profile selected{ticked.size ? ` (${ticked.size})` : ''}
               </button>
             </div>
-          )
+          ))
         }
       >
         {progress && (
@@ -165,7 +180,7 @@ function ConnectorTables({ code, canRead, onProfiled }: { code: string; canRead:
             This connector has no tables yet.
           </EmptyState>
         )}
-        {all.length > 0 && (
+        {all.length > 0 && !folded && (
           <ul className="pick-tables">
             {all.map((name) => (
               <li key={name}>
@@ -214,8 +229,31 @@ function ConnectorTables({ code, canRead, onProfiled }: { code: string; canRead:
   )
 }
 
+type Filter = 'all' | 'empty' | 'mixed'
+
+const FILTERS: { value: Filter; label: string }[] = [
+  { value: 'all', label: 'All columns' },
+  { value: 'empty', label: 'Has empty values' },
+  { value: 'mixed', label: 'Mixed lengths' },
+]
+
+const isMixed = (c: ColumnCounts) => c.counts.filter((x) => x.count > 0).length > 1
+const percent = (part: number, whole: number) => (whole ? Math.round((100 * part) / whole) : 0)
+
+function Tile({ label, value, note }: { label: string; value: string; note?: string }) {
+  return (
+    <div className="bronze-tile">
+      <span className="text-sm muted">{label}</span>
+      <strong>{value}</strong>
+      {note && <span className="text-xs muted">{note}</span>}
+    </div>
+  )
+}
+
 function Counts({ code, table }: { code: string; table: string }) {
   const result = useApi(() => api.rawProfile(code, table), [code, table])
+  const [filter, setFilter] = useState<Filter>('all')
+  const [search, setSearch] = useState('')
   if (result.error) return <ErrorAlert message={result.error} />
   if (!result.data) {
     return (
@@ -225,50 +263,116 @@ function Counts({ code, table }: { code: string; table: string }) {
     )
   }
   const { rows, columns } = result.data.profile
+  const cells = rows * columns.length
+  const filled = columns.reduce((sum, c) => sum + c.filled, 0)
+  const withEmpty = columns.filter((c) => c.empty > 0).length
+  const mixed = columns.filter(isMixed).length
+  const term = search.trim().toLowerCase()
+  const shown = columns.filter(
+    (c) =>
+      c.name.toLowerCase().includes(term) &&
+      (filter === 'all' || (filter === 'empty' ? c.empty > 0 : isMixed(c))),
+  )
+
   return (
-    <Card flush title={table} description={`${n(rows)} rows · ${columns.length} columns`}>
-      <div className="table-wrap">
-        <table className="table counts-table">
-          <thead>
-            <tr>
-              <th>Column</th>
-              <th className="num">Filled</th>
-              <th className="num">Empty</th>
-              <th className="num">Unique</th>
-              <th>Length</th>
-            </tr>
-          </thead>
-          <tbody>
-            {columns.map((c) => (
-              <CountsRow key={c.name} column={c} />
-            ))}
-          </tbody>
-        </table>
+    <>
+      <div className="bronze-tiles">
+        <Tile label="Rows" value={n(rows)} />
+        <Tile label="Columns" value={n(columns.length)} />
+        <Tile label="Values filled" value={`${percent(filled, cells)}%`} note={`${n(cells - filled)} empty`} />
+        <Tile label="Columns with empty values" value={n(withEmpty)} note={`of ${n(columns.length)}`} />
+        <Tile label="Columns with mixed lengths" value={n(mixed)} note="Check these first" />
       </div>
-    </Card>
+      <Card flush title={table} description={`Showing ${shown.length} of ${columns.length} columns`}>
+        <div className="bronze-tools">
+          <div className="pick-pills" role="group" aria-label="Filter columns">
+            {FILTERS.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                className={`pick-pill${f.value === filter ? ' is-on' : ''}`}
+                aria-pressed={f.value === filter}
+                onClick={() => setFilter(f.value)}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <input
+            className="input"
+            aria-label="Search columns"
+            placeholder="Search columns"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        {shown.length === 0 ? (
+          <EmptyState icon="search" title="No column matches" />
+        ) : (
+          <div className="table-wrap">
+            <table className="table counts-table">
+              <thead>
+                <tr>
+                  <th>Column</th>
+                  <th>Filled</th>
+                  <th className="num">Empty</th>
+                  <th className="num">Unique</th>
+                  <th>What is inside</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((c) => (
+                  <CountsRow key={c.name} column={c} rows={rows} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </>
   )
 }
 
-function CountsRow({ column }: { column: ColumnCounts }) {
+function Bar({ share, title }: { share: number; title: string }) {
+  return (
+    <span className="bronze-bar" title={title}>
+      <i style={{ width: `${share}%` }} />
+    </span>
+  )
+}
+
+function CountsRow({ column, rows }: { column: ColumnCounts; rows: number }) {
+  const inside = column.counts.length ? column.counts : (column.values ?? [])
+  const share = percent(column.filled, rows)
   return (
     <tr>
       <td>
         <strong>{column.name}</strong>
       </td>
-      <td className="num">{n(column.filled)}</td>
+      <td>
+        <span className="bronze-filled">
+          <Bar share={share} title={`${n(column.filled)} of ${n(rows)} rows filled`} />
+          <span className="text-sm">{share}%</span>
+        </span>
+      </td>
       <td className={`num${column.empty ? '' : ' muted'}`}>{n(column.empty)}</td>
       <td className="num">{n(column.unique)}</td>
       <td>
-        {column.counts.length ? (
-          <span className="count-list">
-            {column.counts.map((c) => (
-              <span key={c.label}>
-                {c.label} <strong>{n(c.count)}</strong>
-              </span>
+        {inside.length ? (
+          <ul className="bronze-inside">
+            {inside.map((c) => (
+              <li key={c.label}>
+                <span>{c.label}</span>
+                <Bar
+                  share={percent(c.count, column.filled)}
+                  title={`${c.label}: ${n(c.count)} of ${n(column.filled)} filled values`}
+                />
+                <strong>{n(c.count)}</strong>
+              </li>
             ))}
-          </span>
+          </ul>
         ) : (
-          <span className="muted">—</span>
+          <span className="text-sm muted">Free text</span>
         )}
       </td>
     </tr>

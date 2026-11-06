@@ -122,3 +122,18 @@ class ColumnRule(models.Model):
 
     def __str__(self):
         return f"{self.source.code}:{self.table}.{self.column}"
+
+
+class SavedRegex(models.Model):
+    """A regular expression someone kept in the regex library, to pick on Rules instead of writing it again."""
+
+    name = models.CharField(max_length=80)
+    pattern = models.CharField(max_length=300, unique=True)
+    saved_by = models.CharField(max_length=150, blank=True)
+    saved_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
