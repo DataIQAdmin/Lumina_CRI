@@ -28,7 +28,7 @@ export async function lookupOrganization(code: string): Promise<Organization> {
   const response = await fetchWhileWaking(`/api/organizations/${clean}/`, { headers: { Accept: 'application/json' } })
   const data = await response.json().catch(() => ({}))
   if (!response.ok) {
-    throw new Error(data.detail ?? 'Could not check that organization. Please try again.')
+    throw new Error(data.detail ?? 'The server is still starting. Please try again in a minute.')
   }
   return data as Organization
 }
