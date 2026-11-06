@@ -130,6 +130,10 @@ export function ConnectorSetupPage() {
 // Connector types that can read customers from several tables or collections.
 const MULTI_TABLE = ['postgresql', 'mysql', 'mongodb', 'snowflake', 'databricks', 'servicenow', 'salesforce', 'cloudera']
 
+// The old flow fed the customer pages: map columns, set trust, sync. It is off while those are rebuilt; connectors
+// only need their connection now, and tables are read on Data profiling.
+const CUSTOMER_STEPS = false as boolean
+
 function SetupSteps({ source, type, onChanged }: { source: Source; type: ConnectorType; onChanged: () => void }) {
   // Bumped after files change, so the mapping step reads the columns again.
   const [filesVersion, setFilesVersion] = useState(0)
@@ -156,17 +160,21 @@ function SetupSteps({ source, type, onChanged }: { source: Source; type: Connect
       ) : (
         <ConnectionStep source={source} type={type} onChanged={onChanged} />
       )}
-      <MappingStep source={source} type={type} onChanged={onChanged} refresh={filesVersion} />
-      {MULTI_TABLE.includes(type.type) && 'object' in source.mapping && (
-        <CustomerTablesCard source={source} type={type} onChanged={onChanged} />
+      {CUSTOMER_STEPS && (
+        <>
+          <MappingStep source={source} type={type} onChanged={onChanged} refresh={filesVersion} />
+          {MULTI_TABLE.includes(type.type) && 'object' in source.mapping && (
+            <CustomerTablesCard source={source} type={type} onChanged={onChanged} />
+          )}
+          {type.type !== 'file_upload' && <AccountsStep source={source} type={type} onChanged={onChanged} />}
+          <FieldTrustStep
+            source={source}
+            title={<StepTitle n={type.type === 'file_upload' ? 3 : 4} text="Trust" />}
+            onChanged={onChanged}
+          />
+          <SyncStep source={source} onChanged={onChanged} n={type.type === 'file_upload' ? 4 : 5} />
+        </>
       )}
-      {type.type !== 'file_upload' && <AccountsStep source={source} type={type} onChanged={onChanged} />}
-      <FieldTrustStep
-        source={source}
-        title={<StepTitle n={type.type === 'file_upload' ? 3 : 4} text="Trust" />}
-        onChanged={onChanged}
-      />
-      <SyncStep source={source} onChanged={onChanged} n={type.type === 'file_upload' ? 4 : 5} />
     </>
   )
 }

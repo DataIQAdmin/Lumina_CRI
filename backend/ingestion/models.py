@@ -79,8 +79,7 @@ class RawTable(models.Model):
     sensitive = models.JSONField(default=list)  # identity-number columns, kept only masked (see raw.protect)
     rows = models.PositiveIntegerField(default=0)
     complete = models.BooleanField(default=True)  # False when the table had more rows than Lumina reads
-    profile = models.JSONField(default=dict, blank=True)  # data profiling of the rows read (table_profile.py)
-    silver = models.JSONField(default=dict, blank=True)  # what the silver layer changes (silver.py)
+    profile = models.JSONField(default=dict, blank=True)  # counts per column of the rows read (bronze.py)
     read_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -97,10 +96,29 @@ class RawRow(models.Model):
     table = models.ForeignKey(RawTable, on_delete=models.CASCADE, related_name="row_set")
     position = models.PositiveIntegerField()
     values = models.JSONField(encoder=DjangoJSONEncoder)
-    # For identity-number columns: {column: [shape, fingerprint]}, e.g. ["AAAAA9999A", "3f9c..."], so profiling
-    # can check the pattern and find duplicates without the readable number ever being stored.
+    # For identity-number columns: {column: [shape, fingerprint, encrypted value]}, e.g. ["AAAAA9999A", "3f9c...",
+    # "enc:v1:..."], so rules can check the real value without the readable number ever being stored.
     protected = models.JSONField(default=dict, blank=True)
 
     class Meta:
         ordering = ["table", "position"]
         indexes = [models.Index(fields=["table", "position"])]
+
+
+class ColumnRule(models.Model):
+    """One regular expression applied to one column of a table. Kept by name, so it survives reading the table
+    again. Rows that pass every rule of their table form the silver layer (rules.py)."""
+
+    source = models.ForeignKey(Source, on_delete=models.CASCADE, related_name="column_rules")
+    table = models.CharField(max_length=200)
+    column = models.CharField(max_length=200)
+    pattern = models.CharField(max_length=300)
+    applied_by = models.CharField(max_length=150, blank=True)
+    applied_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["source", "table", "column"]
+        constraints = [models.UniqueConstraint(fields=["source", "table", "column"], name="unique_rule_per_column")]
+
+    def __str__(self):
+        return f"{self.source.code}:{self.table}.{self.column}"

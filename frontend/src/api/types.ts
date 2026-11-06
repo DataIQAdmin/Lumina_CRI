@@ -539,19 +539,19 @@ export interface CustomerBreakdown {
   options: Record<string, { key: string; label: string; count: number; members?: string[] }[]>
 }
 
-// Raw layer (Data profiling, Source tables): every table of a connector, read whole as the system holds it.
+// Bronze layer (Data profiling): the tables of a connector, profiled when chosen.
 export interface RawSource {
   code: string
   name: string
   connector_type: string
   enabled: boolean
-  tables: number // tables read so far
+  tables: number
   read_at: string | null
 }
 
 export interface RawSources {
   sources: RawSource[]
-  can_read: boolean // stewards and admins
+  can_read: boolean
   can_view_rows: boolean
 }
 
@@ -559,113 +559,63 @@ export interface RawTable {
   name: string
   columns: number
   rows: number
-  complete: boolean // false: the table has more rows than Lumina reads
-  sensitive: string[] // identity-number columns, stored masked
+  complete: boolean
+  sensitive: string[]
   read_at: string
-  score: number | null // share of rule checks passed, 0 to 100 (null: read before profiling existed)
-  issues: number // rules broken by at least one row
 }
 
-export interface RawRows extends RawTable {
-  column_names: string[]
-  page: number
-  page_size: number
-  count: number // rows on offer: the whole table, or the rows breaking the chosen rule (up to 500 kept)
-  total: number // rows breaking the rule in all
-  positions: number[]
-  results: (string | number | boolean | null)[][]
-}
-
-// Data profile of one raw table (backend ingestion/table_profile.py).
-export interface ProfileRule {
-  key: string // e.g. "email", "unique", "formats"
-  label: string
-  checked: number
-  failed: number
-}
-
-export interface ColumnProfile {
+export interface ColumnCounts {
   name: string
-  type: string
-  type_label: string
-  identity: boolean // identity number: only patterns, never values
-  key?: boolean // the table's own ID column
-  rows: number
+  filled: number
   empty: number
-  distinct: number
-  duplicates: number
-  min_length: number | null
-  max_length: number | null
-  min?: number | string
-  max?: number | string
-  patterns: { value: string; count: number }[]
-  pattern_count: number
-  top: { value: string; count: number }[] // empty for roles that do not see personal details
-  types: { type: string; label: string; count: number }[]
-  date_formats?: { format: string; count: number }[]
-  rules: ProfileRule[]
-}
-
-export interface TableProfile {
-  rows: number
-  column_count: number
-  key: string | null
-  complete_rows: number
-  duplicate_rows: number
-  filled_share: number
-  rules_checked: number
-  rules_failed: number
-  score: number
-  columns: ColumnProfile[]
+  unique: number
+  counts: { label: string; count: number }[]
 }
 
 export interface RawTableProfile extends RawTable {
-  column_names: string[]
-  profile: TableProfile | Record<string, never>
+  profile: { rows: number; columns: ColumnCounts[] }
 }
 
-export interface TableLink {
-  table: string
-  column: string
-  to_table: string
-  to_column: string
-  checked: number
-  matched: number
-  missing: number
-  share: number
+// Rules: one regex per column; only rows passing all of them reach silver (backend ingestion/rules.py).
+export interface RegexCheck {
+  valid: boolean
+  error: string
 }
 
-// Silver layer (Administration): each raw table cleaned the same simple way (backend ingestion/silver.py).
+export interface RuleColumns {
+  name: string
+  rows: number
+  columns: { name: string; pattern: string }[]
+}
+
+export interface RulePreview {
+  total: number
+  passed: number
+  failed: number
+  sample: { position: number; value: unknown; passed: boolean }[]
+}
+
+export interface RegexLibrary {
+  patterns: { pattern: string; used: { code: string; source: string; table: string; column: string }[] }[]
+  tables: { code: string; source: string; table: string }[]
+}
+
 export interface SilverTable {
   name: string
-  columns: number
-  rows_in: number
-  rows_out: number | null // null: read before profiling existed
-  changed_cells: number | null
-  emptied: number | null
+  rows: number
+  rules: number
+  passed: number
+  rejected: number
   read_at: string
-}
-
-export interface SilverChange {
-  key: string
-  label: string
-  count: number
-  examples: { before: string | null; after: string | null }[] // empty for roles that do not see personal details
-}
-
-export interface SilverDetail extends SilverTable {
-  dropped: number // exact copies left out
-  changes: { name: string; changes: SilverChange[] }[]
 }
 
 export interface SilverRows {
   column_names: string[]
+  rules: Record<string, string>
   page: number
   page_size: number
   count: number
-  results: {
-    position: number
-    values: (string | number | boolean | null)[]
-    changed: Record<string, { was: string | number | boolean | null; why: string }>
-  }[]
+  passed: number
+  rejected: number
+  results: { position: number; values: unknown[]; failed: string[] }[]
 }

@@ -48,7 +48,7 @@ class Command(BaseCommand):
                 if GoldenField.objects.filter(score_trust__isnull=True).exists():
                     rebuild_customers()  # once after a scoring change: values saved before it have no score_trust
                     self.stdout.write(f"{tenant.name}: trust scores recalculated.")
-                if feed_file().exists():
+                if settings.DEMO_SOURCES and feed_file().exists():
                     import_feed()  # picks up changes to the compliance feed; unchanged rows stay as they are
                 if demo_password:
                     for username, first, last, group_name in DEMO_USERS:

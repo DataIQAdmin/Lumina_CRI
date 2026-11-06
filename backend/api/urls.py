@@ -1,7 +1,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from . import admin_views, connector_views, ingest_views, interaction_views, profiling_views, raw_views, views
+from . import admin_views, connector_views, ingest_views, interaction_views, profiling_views, raw_views, rule_views, views
 
 router = DefaultRouter()
 router.register("sources", views.SourceViewSet, basename="source")
@@ -20,10 +20,14 @@ urlpatterns = [
     path("raw/<slug:code>/read/", raw_views.read),
     path("raw/<slug:code>/rows/", raw_views.rows),
     path("raw/<slug:code>/profile/", raw_views.profile),
-    path("raw/<slug:code>/relationships/", raw_views.links),
-    path("silver/<slug:code>/", raw_views.silver_tables),
-    path("silver/<slug:code>/table/", raw_views.silver_table),
-    path("silver/<slug:code>/rows/", raw_views.silver_rows),
+    path("rules/<slug:code>/", rule_views.rules),
+    path("rules/<slug:code>/preview/", rule_views.preview),
+    path("rules/<slug:code>/remove/", rule_views.remove),
+    path("regex/check/", rule_views.check),
+    path("regex/library/", rule_views.library),
+    path("regex/test/", rule_views.test),
+    path("silver/<slug:code>/", rule_views.silver_tables),
+    path("silver/<slug:code>/rows/", rule_views.silver_rows),
     path("customers/<int:pk>/interactions/", interaction_views.customer_interactions),
     path("customers/<int:pk>/briefing/", interaction_views.customer_briefing),
     path("interactions/open/", interaction_views.open_items),
