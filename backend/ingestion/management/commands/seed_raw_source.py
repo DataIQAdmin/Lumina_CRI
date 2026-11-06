@@ -33,7 +33,7 @@ class Command(BaseCommand):
         parser.add_argument("kind", choices=list(SLOTS))
         parser.add_argument("--bank", choices=["axis", "hdfc"], required=True)
         parser.add_argument("--data", required=True, help="Folder with the CSV files (Lumina Source Data\\Data).")
-        parser.add_argument("--customers", type=int, default=5000)
+        parser.add_argument("--customers", type=int, default=500)
         parser.add_argument("--out", help="csv only: folder to write the 11 files to.")
 
     def handle(self, *args, kind, bank, data, customers, out=None, **options):

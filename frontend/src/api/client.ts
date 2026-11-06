@@ -31,14 +31,15 @@ import type {
   TableRemoval,
   ProfilingSummary,
   ProfiledRecords,
-  RawRows,
   RawSources,
   RawTable,
   RawTableProfile,
-  SilverDetail,
+  RegexCheck,
+  RegexLibrary,
+  RuleColumns,
+  RulePreview,
   SilverRows,
   SilverTable,
-  TableLink,
   User,
 } from './types'
 import { ORG_BASE } from '../organization'
@@ -224,19 +225,23 @@ export const api = {
   rawTables: (code: string) => get<{ code: string; name: string; tables: RawTable[] }>(`/raw/${code}/`),
   rawDiscover: (code: string) => post<{ tables: string[]; dropped: number }>(`/raw/${code}/discover/`),
   rawRead: (code: string, table: string) => post<RawTable>(`/raw/${code}/read/`, { table }),
-  rawRows: (code: string, table: string, page: number, drill?: { column?: string; rule: string }) =>
-    get<RawRows>(
-      `/raw/${code}/rows/?table=${encodeURIComponent(table)}&page=${page}` +
-        (drill ? `&rule=${encodeURIComponent(drill.rule)}&column=${encodeURIComponent(drill.column ?? '')}` : ''),
-    ),
   rawProfile: (code: string, table: string) =>
     get<RawTableProfile>(`/raw/${code}/profile/?table=${encodeURIComponent(table)}`),
-  rawLinks: (code: string) => get<{ relationships: TableLink[] }>(`/raw/${code}/relationships/`),
+  ruleColumns: (code: string, table: string) =>
+    get<RuleColumns>(`/rules/${code}/?table=${encodeURIComponent(table)}`),
+  rulePreview: (code: string, table: string, column: string, pattern: string) =>
+    post<RulePreview>(`/rules/${code}/preview/`, { table, column, pattern }),
+  ruleApply: (code: string, table: string, column: string, pattern: string) =>
+    post<{ passed: number; failed: number; total: number }>(`/rules/${code}/`, { table, column, pattern }),
+  ruleRemove: (code: string, table: string, column: string) =>
+    post<{ removed: number }>(`/rules/${code}/remove/`, { table, column }),
+  regexCheck: (pattern: string) => post<RegexCheck>('/regex/check/', { pattern }),
+  regexLibrary: () => get<RegexLibrary>('/regex/library/'),
+  regexTest: (code: string, table: string, pattern: string) =>
+    post<{ columns: { column: string; matched: number; filled: number }[] }>('/regex/test/', { code, table, pattern }),
   silverTables: (code: string) => get<{ code: string; name: string; tables: SilverTable[] }>(`/silver/${code}/`),
-  silverTable: (code: string, table: string) =>
-    get<SilverDetail>(`/silver/${code}/table/?table=${encodeURIComponent(table)}`),
-  silverRows: (code: string, table: string, page: number) =>
-    get<SilverRows>(`/silver/${code}/rows/?table=${encodeURIComponent(table)}&page=${page}`),
+  silverRows: (code: string, table: string, show: 'passed' | 'rejected', page: number) =>
+    get<SilverRows>(`/silver/${code}/rows/?table=${encodeURIComponent(table)}&show=${show}&page=${page}`),
   connectorFiles: (code: string) => get<UploadedFile[]>(`/connectors/${code}/files/`),
   setFileStatus: (code: string, ids: number[], status: UploadedFile['status']) =>
     post<{ changed: number; files: UploadedFile[] }>(`/connectors/${code}/files/status/`, { ids, status }),

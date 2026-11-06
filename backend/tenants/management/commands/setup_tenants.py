@@ -21,14 +21,14 @@ def ensure_public_tenant():
 
 def load_demo_data(code, stdout):
     """Fill one organization from fake_sources/<code>/: core banking, Salesforce, branch files, compliance.
-    With DEMO_SOURCES=off only the compliance feed is loaded; customers come from the bank's own connectors."""
+    With DEMO_SOURCES=off nothing is loaded; data comes from the bank's own connectors."""
     with schema_context(code):
         if settings.DEMO_SOURCES:
             call_command("load_fake_flexcube", stdout=stdout)
             for source in ["flexcube", "salesforce", "branch_csv"]:
                 call_command("sync", source, stdout=stdout)
             call_command("build_customers", stdout=stdout)
-        call_command("sync_compliance", stdout=stdout)
+            call_command("sync_compliance", stdout=stdout)
 
 
 class Command(BaseCommand):

@@ -25,8 +25,8 @@ def folder(tmp_path):
             w.writerow(header)
             w.writerows(rows)
 
-    write("customer_master_final.csv", ["CustomerID", "CustomerName", "PAN"],
-          [[f"C{i}", f"Person {i}", ""] for i in range(N)])
+    write("customer_master_final.csv", ["CustomerID", "CustomerName", "PAN", "Note"],
+          [[f"C{i}", f"Person {i}", "", ""] for i in range(N)])
     for file in ["Customer_Address_Test_Data.csv", "Customer_Email_Test_Data.csv", "Customer_Phone_Test_Data.csv",
                  "Customer_Employer_Test_Data.csv", "AML_Test_Data.csv"]:
         write(file, ["RowID", "CustomerID", "Value"], [[f"R{i}", f"C{i}", f"v{i}"] for i in range(N)])
@@ -60,7 +60,8 @@ def test_sample_keeps_every_linked_row_and_all_11_tables(folder):
     assert len(accounts) == 10 and {r[1] for r in tables["product_account"][1]} == accounts
     products = ids(tables, "product_account")
     assert {r[1] for r in tables["product_account_phone"][1]} == products
-    assert tables["customer_master"][1][0] == ["C0", "Person 0", ""]  # values exactly as in the file
+    first = tables["customer_master"][1][0]
+    assert first[0] == "C0" and first[1] != "Person 0" and first[3] == ""  # people are fake, the rest as in the file
 
 
 def test_too_many_customers_is_refused(folder):
@@ -93,6 +94,6 @@ def test_postgres_load_replaces_the_old_demo_tables(folder, pg_url, monkeypatch,
             "SELECT table_name FROM information_schema.tables WHERE table_schema = 'core'").fetchall()}
         assert {t[0] for t in TABLES} <= tables and "customers" not in tables  # old demo table gone
         assert conn.execute('SELECT count(*) FROM core.customer_master').fetchone()[0] == 10
-        assert conn.execute('SELECT "PAN" FROM core.customer_master LIMIT 1').fetchone()[0] is None  # empty stays empty
+        assert conn.execute('SELECT "Note" FROM core.customer_master LIMIT 1').fetchone()[0] is None  # empty stays empty
         conn.execute("DROP SCHEMA core CASCADE")
     assert "customer_master" in out.getvalue()

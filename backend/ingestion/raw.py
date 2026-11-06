@@ -5,7 +5,8 @@ stored as a RawTable with its rows. Reading is one table at a time, so a large s
 request. Up to CONNECTOR_MAX_ROWS rows are read per table; a bigger table is marked incomplete.
 
 Identity numbers (PAN, Aadhaar, passport, voter ID, driving licence, CKYC) are never stored readable: the value
-is masked, and only its shape and a keyed fingerprint are kept, enough to check the pattern and find duplicates.
+is masked, and beside it are kept its shape, a keyed fingerprint and the value encrypted, which only rule checks
+open (ingestion/rules.py). It is never sent to the screen.
 """
 
 import csv
@@ -62,7 +63,7 @@ def protect(columns, row, identity=None):
         value = _value(value)
         if value not in (None, "") and column in identity:
             text = str(value).strip()
-            protected[column] = [shape(text), crypto.fingerprint(text)[:16]]
+            protected[column] = [shape(text), crypto.fingerprint(text)[:16], crypto.encrypt(text)]
             value = mask(text)
         values.append(value)
     return values, protected
@@ -113,22 +114,21 @@ def _fetch(source, name, limit):
 
 def read_table(source, name):
     """Read one table whole, profile it and store both, replacing what was read before. Returns the RawTable."""
-    from .silver import summarise
-    from .table_profile import profile_table
+    from .bronze import profile_table
 
     cap = settings.CONNECTOR_MAX_ROWS
     columns, rows = _fetch(source, name, cap + 1)  # one extra row tells whether the table is bigger than the cap
     complete = len(rows) <= cap
     sensitive = [c for c in columns if is_identity(c)]
     identity = set(sensitive)
-    safe = [protect(columns, row, identity) for row in rows[:cap]]  # (values, protected) per row
-    profile = profile_table(columns, [v for v, _ in safe], [p for _, p in safe], set(sensitive))
-    silver = summarise(columns, [v for v, _ in safe], profile)
+    rows = rows[:cap]
+    profile = profile_table(columns, [[_value(v) for v in row] for row in rows])  # counts need the real values
+    safe = [protect(columns, row, identity) for row in rows]  # (values, protected) per row
     with transaction.atomic():
         table, _ = RawTable.objects.update_or_create(
             source=source, name=name,
             defaults={"columns": columns, "sensitive": sensitive, "rows": len(safe), "complete": complete,
-                      "profile": profile, "silver": silver},
+                      "profile": profile},
         )
         table.row_set.all().delete()
         for start in range(0, len(safe), BATCH):

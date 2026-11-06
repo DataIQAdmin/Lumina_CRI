@@ -3,7 +3,6 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type { Capability, Source } from '../api/types'
-import { formatRelative } from '../format'
 import { applyTheme, getTheme, type Theme } from '../theme'
 import { useAuth } from '../auth/AuthContext'
 import { useOrganization } from '../organization'
@@ -16,38 +15,32 @@ type NavItem = { to: string; label: string; icon: IconName; end?: boolean; needs
 
 const GROUPS: { label: string; items: NavItem[] }[] = [
   {
-    label: 'Workspace',
-    items: [
-      { to: '/', label: 'Overview', icon: 'overview', end: true },
-      { to: '/customers', label: 'Customers', icon: 'customers' },
-      { to: '/review', label: 'Match review', icon: 'merge', needs: ['view_matches'] },
-      {
-        to: '/approvals',
-        label: 'Approvals',
-        icon: 'approve',
-        needs: ['approve_corrections', 'propose_corrections'],
-      },
-    ],
-  },
-  {
     label: 'Data',
     items: [
       { to: '/connectors', label: 'Connectors', icon: 'connectors' },
       { to: '/profiling', label: 'Data profiling', icon: 'search' },
+      { to: '/rules', label: 'Rules', icon: 'sliders', needs: ['manage_sources'] },
+      { to: '/regex', label: 'Regex library', icon: 'key', needs: ['manage_sources'] },
+      { to: '/silver', label: 'Silver layer', icon: 'layers', needs: ['manage_sources'] },
+    ],
+  },
+  {
+    label: 'Being rebuilt',
+    items: [
+      { to: '/customers', label: 'Customers', icon: 'customers' },
+      { to: '/review', label: 'Match review', icon: 'merge' },
+      { to: '/approvals', label: 'Approvals', icon: 'approve' },
+      { to: '/compliance', label: 'Compliance', icon: 'shield' },
     ],
   },
   {
     label: 'Governance',
-    items: [
-      { to: '/compliance', label: 'Compliance', icon: 'shield', needs: ['view_compliance'] },
-      { to: '/audit', label: 'Audit log', icon: 'audit', needs: ['view_audit'] },
-    ],
+    items: [{ to: '/audit', label: 'Audit log', icon: 'audit', needs: ['view_audit'] }],
   },
   {
     label: 'Administration',
     items: [
       { to: '/users', label: 'Users and roles', icon: 'customers', needs: ['manage_users'] },
-      { to: '/silver', label: 'Silver layer', icon: 'layers', needs: ['manage_sources'] },
       { to: '/settings', label: 'Settings', icon: 'sliders', needs: ['manage_settings'] },
     ],
   },
@@ -58,7 +51,6 @@ const GROUPS: { label: string; items: NavItem[] }[] = [
 ]
 
 const PAGE_TITLES = [
-  { path: '/', title: 'Overview', exact: true },
   { path: '/customers', title: 'Customers' },
   { path: '/review', title: 'Match review' },
   { path: '/connectors', title: 'Connectors' },
@@ -70,6 +62,8 @@ const PAGE_TITLES = [
   { path: '/password', title: 'Change password' },
   { path: '/compliance', title: 'Compliance' },
   { path: '/profiling', title: 'Data profiling' },
+  { path: '/rules', title: 'Rules' },
+  { path: '/regex', title: 'Regex library' },
   { path: '/silver', title: 'Silver layer' },
 ]
 
@@ -120,13 +114,8 @@ export function Layout() {
       .catch(() => setSources(null))
   }, [location.pathname, canSeeMatches, canApprove])
 
-  const page = PAGE_TITLES.find((p) => (p.exact ? location.pathname === p.path : location.pathname.startsWith(p.path)))
+  const page = PAGE_TITLES.find((p) => location.pathname.startsWith(p.path))
   const off = sources?.filter((s) => !s.enabled).length ?? 0
-  const lastSync = sources
-    ?.map((s) => s.last_synced_at)
-    .filter(Boolean)
-    .sort()
-    .at(-1)
 
   return (
     <div className="shell">
@@ -213,7 +202,7 @@ export function Layout() {
                 <span className="pill-long">
                   {off
                     ? `${off} source${off > 1 ? 's' : ''} disconnected`
-                    : `All ${sources.length} sources connected · synced ${formatRelative(lastSync ?? null).toLowerCase()}`}
+                    : `All ${sources.length} sources connected`}
                 </span>
                 <span className="pill-short">{off ? `${off} off` : `${sources.length} live`}</span>
               </span>

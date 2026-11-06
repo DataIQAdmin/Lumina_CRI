@@ -2,15 +2,19 @@
 emails, phones, employers and AML checks; accounts and products with their own contact details).
 
 The full files (100,000 rows each) live outside the project, in the folder given to the seed command. Each demo
-connector gets a sample: by default 5,000 customers with every row linked to them. Within one bank, 70% of the
-customers are the same in every connector and 30% are its own, so the systems overlap the way real ones do.
-Axis and HDFC draw from different halves of the files. Rows are copied exactly as they are in the files, problems
-included (mixed date formats, damaged Aadhaar numbers, accounts whose customer ID matches no customer): those are
-what data profiling is meant to find.
+connector gets a sample: by default 500 customers, and no table holds more than 500 rows. Within one bank, 70% of
+the customers are the same in every connector and 30% are its own, so the systems overlap the way real ones do.
+Axis and HDFC draw from different halves of the files.
+
+Names, phones, emails, PAN and Aadhaar are replaced with fake ones made here (ingestion/fake_people.py): most are
+correct and some are wrong on purpose, so profiling and regex rules have something to find. The same customer gets
+the same fake details in every connector.
 """
 
 import csv
 from pathlib import Path
+
+from .fake_people import fake_table
 
 # (table name in the source systems, file, column it is linked by, the table and column it links to)
 TABLES = [
@@ -61,7 +65,7 @@ def customer_positions(total, bank, slot, customers):
     return list(range(start, start + shared)) + list(range(first_own, first_own + own))
 
 
-def sample(folder, bank, slot, customers=5000):
+def sample(folder, bank, slot, customers=500):
     """{table: (header, rows)} for one connector. slot: 1, 2, 3... one per connector of the bank."""
     out = {}
     header, rows = read_table(folder, "customer_master_final.csv")
@@ -74,17 +78,17 @@ def sample(folder, bank, slot, customers=5000):
         if name == "account_master":
             # Account IDs in the files do not point at any customer, so take the accounts in the same row
             # positions as the chosen customers; profiling reports the broken link.
-            picked = [rows[i] for i in positions if i < len(rows)]
+            picked = [rows[i] for i in positions if i < len(rows)][:customers]
         else:
             parent, parent_key = link
             wanted = chosen[parent]
             i = header.index(key)
-            picked = [r for r in rows if len(r) > i and r[i] in wanted]
+            picked = [r for r in rows if len(r) > i and r[i] in wanted][:customers]
         out[name] = (header, picked)
         if name in ("account_master", "product_account"):
             id_column = "AccountID" if name == "account_master" else "ProductAccountID"
             chosen[name] = {r[header.index(id_column)] for r in picked}
-    return out
+    return {name: fake_table(header, rows) for name, (header, rows) in out.items()}
 
 
 def write_csv_folder(tables, folder):
