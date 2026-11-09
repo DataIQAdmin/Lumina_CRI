@@ -84,7 +84,7 @@ def test_every_table_is_read_whole_with_pan_masked(admin, connector):
     assert page["column_names"] == ["CustomerID", "CustomerName", "PAN", "DateOfBirth"]
     assert page["results"][0] == ["C1", "Asha Rao", "XXXXXX234F", "1990-05-01"]
     assert page["results"][1] == ["C2", "Vikram", None, None]  # empty stays empty
-    # The readable PAN is nowhere in the stored rows; shape and fingerprint are kept for profiling.
+    # The readable PAN is nowhere in the stored rows; shape, fingerprint and the encrypted value are kept for rules.
     stored = list(RawRow.objects.filter(table__name=f"{schema}.customer_master").order_by("position"))
     assert "ABCDE1234F" not in str([(r.values, r.protected) for r in stored])
     assert stored[0].protected["PAN"][0] == "AAAAA9999A" and stored[2].protected["PAN"][0] == "aaaaa9999a"
