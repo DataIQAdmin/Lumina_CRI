@@ -1,8 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "https://lumina-cri-api.onrender.com/api/$1" },
-    { "source": "/t/([^/]+)/api/(.*)", "destination": "https://lumina-cri-api.onrender.com/t/$1/api/$2" },
+    { "source": "/api/(.*)", "destination": "https://lumina-cri-api-ju14.onrender.com/api/$1" },
+    { "source": "/t/([^/]+)/api/(.*)", "destination": "https://lumina-cri-api-ju14.onrender.com/t/$1/api/$2" },
     { "source": "/((?!api/|assets/|t/[^/]+/api/).*)", "destination": "/index.html" }
   ],
   "headers": [

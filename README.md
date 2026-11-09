@@ -51,8 +51,8 @@ You need Git, Docker Desktop, Python 3.10 or newer, and Node 20 or newer.
 **1. Get the code**
 
 ```
-git clone https://github.com/ibrahim-dev444/Lumina-CRI.git
-cd Lumina-CRI
+git clone https://github.com/DataIQAdmin/Lumina_CRI.git
+cd Lumina_CRI
 ```
 
 **2. Create your `.env`.** Copy `.env.example` to `.env`, then replace `change-me-locally` (both places) with a password of your choice, and `DJANGO_SECRET_KEY` with a random string. To make one:

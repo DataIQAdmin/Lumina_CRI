@@ -21,5 +21,5 @@ jobs:
           if [ -z "$TOKEN" ]; then echo "SYNC_RUNNER_TOKEN secret not set; nothing to do."; exit 0; fi
           curl -fsS --retry 3 --retry-all-errors --max-time 300 -X POST \
             -H "X-Sync-Token: $TOKEN" \
-            https://lumina-cri-api.onrender.com/api/internal/run-due-syncs/ \
+            https://lumina-cri-api-ju14.onrender.com/api/internal/run-due-syncs/ \
             || echo "::warning::Scheduled sync call failed; it runs again next hour."
