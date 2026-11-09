@@ -19,6 +19,6 @@ jobs:
         # A failed ping only warns: it must not email anyone every 10 minutes.
         run: |
           curl -fsS --retry 3 --retry-all-errors --max-time 90 -o /dev/null \
-            https://lumina-cri-api.onrender.com/api/health/ \
+            https://lumina-cri-api-ju14.onrender.com/api/health/ \
             && echo "Server is awake." \
             || echo "::warning::Server did not answer; it will be pinged again in 10 minutes."
