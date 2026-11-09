@@ -2,7 +2,7 @@
 
 Bank customer data platform. Lumina reads customer data from several bank systems, cleans it, works out which records belong to the same person, builds one **golden record** per customer, and gives each customer a **trust score** from 0 to 100.
 
-Live demo: https://lumina-cri.vercel.app (see [Hosted demo](#hosted-demo)).
+Live demo: https://lumina-cri-flame.vercel.app (see [Hosted demo](#hosted-demo)).
 
 Team rules (branches, pull requests, migrations, secrets) are in [CONTRIBUTING.md](CONTRIBUTING.md). Read it before your first change.
 
