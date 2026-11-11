@@ -114,6 +114,41 @@ def profile(request, code):
     return Response({**_table_json(table), "profile": table.profile or {}})
 
 
+PROOF_PAGE = 20
+
+
+@api_view(["GET"])
+@permission_classes([HasRole, requires("view_pii")])
+def proof(request, code):
+    """GET /api/raw/<code>/proof/?table=<name>&column=<name>&label=<count>&page=1  The rows behind one count of the
+    profile ("9 digits", "Empty", "Office"...), so people can see a count is real. 20 rows a page, each with its
+    row number, the table's first column (usually its ID) and the value as stored (identity numbers masked)."""
+    from ingestion.bronze import label_of
+    from ingestion.rules import rows_of
+
+    source, error = _source(code)
+    if error:
+        return error
+    table, error = _table(source, request.query_params.get("table"))
+    if error:
+        return error
+    column, label = request.query_params.get("column", ""), request.query_params.get("label", "")
+    profiled = next((c for c in (table.profile or {}).get("columns", []) if c["name"] == column), None)
+    if profiled is None or column not in table.columns:
+        return Response({"detail": "This table has no such column."}, status=status.HTTP_404_NOT_FOUND)
+    try:
+        page = max(int(request.query_params.get("page", 1)), 1)
+    except ValueError:
+        page = 1
+    i = table.columns.index(column)
+    found = [(position, shown) for position, plain, shown in rows_of(table) if label_of(profiled, plain[i]) == label]
+    start = (page - 1) * PROOF_PAGE
+    return Response({"column": column, "label": label, "key": table.columns[0], "count": len(found), "page": page,
+                     "page_size": PROOF_PAGE, "results": [
+                         {"row": position + 1, "key": shown[0], "value": shown[i]}
+                         for position, shown in found[start:start + PROOF_PAGE]]})
+
+
 @api_view(["GET"])
 @permission_classes([HasRole, requires("view_pii")])
 def rows(request, code):

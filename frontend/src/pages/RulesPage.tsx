@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 
 import { api } from '../api/client'
-import type { ReadyRegex, RegexCheck, RegexLibrary, RegexSuggestion, RulePreview } from '../api/types'
+import type { ReadyRegex, RegexCheck, RegexLibrary, RulePreview } from '../api/types'
 import { useApi } from '../api/useApi'
 import { ConnectorPicker } from '../components/ConnectorPicker'
 import { Icon } from '../components/Icon'
@@ -95,9 +95,10 @@ function LibraryPicker({
   const fits = suggested(column, library.ready)
   return (
     <label className="regex-pick">
-      <span className="text-sm muted">Choose from the library</span>
+      <span className="text-sm muted">Or choose from the library</span>
       <select
         className="select"
+        aria-label="Choose from the library"
         value=""
         onChange={(e) => {
           if (e.target.value) onPick(e.target.value)
@@ -134,37 +135,121 @@ function LibraryPicker({
   )
 }
 
-// Ask the AI helper for a regex. The answer comes back checked and tested on this column; "Use this" only puts it
-// in the box, so the usual Preview and Apply still decide.
-function AiHelper({
+// A regex someone could use, from the AI or the library: what it checks, made-up values it lets through and values
+// it stops (each checked against the regex), and how this column does. "Use this" only fills the box below.
+interface Offer {
+  source: 'ai' | 'library'
+  title: string
+  pattern: string
+  matching: string[]
+  failing: { value: string; why: string }[]
+  passed?: number
+  total?: number
+}
+
+function OfferCard({ offer, onUse, onRetry, busy }: { offer: Offer; onUse: () => void; onRetry?: () => void; busy?: boolean }) {
+  return (
+    <div className="offer" role="status">
+      <div className="offer-head">
+        <span className="offer-tag">{offer.source === 'ai' ? 'Suggested by AI' : 'From the library'}</span>
+        {offer.total !== undefined && (
+          <span className="text-sm muted">
+            {n(offer.passed ?? 0)} of {n(offer.total)} rows in this column pass
+          </span>
+        )}
+      </div>
+      <code className="offer-pattern">{offer.pattern}</code>
+      {offer.title && <p className="text-sm">{offer.title}</p>}
+      {(offer.matching.length > 0 || offer.failing.length > 0) && (
+        <div className="offer-examples">
+          <div>
+            <span className="offer-label is-good">
+              <Icon name="check" size={13} /> Valid
+            </span>
+            <ul>
+              {offer.matching.map((v) => (
+                <li key={v}>
+                  <code>{v}</code>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <span className="offer-label is-bad">
+              <Icon name="x" size={13} /> Not valid
+            </span>
+            <ul>
+              {offer.failing.map((f) => (
+                <li key={f.value}>
+                  <code>{f.value === '' ? '(empty)' : f.value}</code>
+                  {f.why && <span className="text-xs muted"> {f.why}</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+      <div className="row" style={{ gap: 8 }}>
+        <button type="button" className="btn btn-sm btn-primary" onClick={onUse}>
+          Use this
+        </button>
+        {onRetry && (
+          <button type="button" className="btn btn-sm" disabled={busy} onClick={onRetry}>
+            Try again
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Step 1: ask the AI (optionally in words), or pick from the library. Either way an OfferCard shows the regex with
+// its examples, and nothing reaches the box until "Use this".
+function GetRegex({
   code,
   table,
   column,
+  library,
   onUse,
 }: {
   code: string
   table: string
   column: string
+  library: RegexLibrary | null
   onUse: (pattern: string) => void
 }) {
   const [wish, setWish] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [found, setFound] = useState<RegexSuggestion | null>(null)
+  const [offer, setOffer] = useState<Offer | null>(null)
   const ask = async () => {
     setBusy(true)
     setError(null)
     try {
-      setFound(await api.ruleSuggest(code, table, column, wish))
+      const got = await api.ruleSuggest(code, table, column, wish)
+      setOffer({ source: 'ai', title: got.explanation, pattern: got.pattern, matching: got.matching,
+        failing: got.failing, passed: got.passed, total: got.total })
     } catch (e) {
-      setFound(null)
+      setOffer(null)
       setError((e as Error).message)
     } finally {
       setBusy(false)
     }
   }
+  const pick = (pattern: string) => {
+    const ready = library?.ready.find((r) => r.pattern === pattern)
+    const saved = library?.saved.find((r) => r.pattern === pattern)
+    setError(null)
+    setOffer({
+      source: 'library',
+      title: ready?.name ?? saved?.name ?? '',
+      pattern,
+      matching: ready ? [ready.example] : [],
+      failing: ready ? [{ value: ready.bad[0], why: ready.bad[1] }] : [],
+    })
+  }
   return (
-    <div className="ai-helper">
+    <div className="stack" style={{ gap: 10 }}>
       <div className="ai-helper-ask">
         <input
           className="input"
@@ -180,28 +265,31 @@ function AiHelper({
           <Icon name="search" size={14} /> {busy ? 'Thinking...' : 'Suggest with AI'}
         </button>
       </div>
-      {error && <ErrorAlert message={error} />}
-      {found && (
-        <div className="ai-helper-answer" role="status">
-          <code>{found.pattern}</code>
-          {found.explanation && <p className="text-sm">{found.explanation}</p>}
-          <p className="text-sm muted">
-            {n(found.passed)} of {n(found.total)} rows pass this regex.
-          </p>
-          <div className="row" style={{ gap: 8 }}>
-            <button type="button" className="btn btn-sm btn-primary" onClick={() => onUse(found.pattern)}>
-              Use this
-            </button>
-            <button type="button" className="btn btn-sm" disabled={busy} onClick={ask}>
-              Try again
-            </button>
-          </div>
-        </div>
-      )}
+      <LibraryPicker library={library} column={column} onPick={pick} />
       <p className="text-xs muted">
         Only the column name and the shape of its values (like AAAAA9999A) go to the AI, never the values.
       </p>
+      {error && <ErrorAlert message={error} />}
+      {offer && (
+        <OfferCard
+          offer={offer}
+          busy={busy}
+          onUse={() => onUse(offer.pattern)}
+          onRetry={offer.source === 'ai' ? ask : undefined}
+        />
+      )}
     </div>
+  )
+}
+
+function Step({ n: number, title, children }: { n: number; title: string; children: ReactNode }) {
+  return (
+    <section className="rule-step">
+      <h3>
+        <span className="step-n">{number}</span> {title}
+      </h3>
+      {children}
+    </section>
   )
 }
 
@@ -340,37 +428,43 @@ function RuleEditor({
 
   return (
     <Card title={column} description="The whole value must match. Empty values fail unless your regex allows them.">
-      <div className="stack" style={{ gap: 12 }}>
-        <AiHelper code={code} table={table} column={column} onUse={setPattern} />
-        <details className="regex-browse">
-          <summary className="text-sm">Or browse the regex library</summary>
-          <LibraryPicker library={library} column={column} onPick={setPattern} />
-        </details>
-        <input
-          className="input regex-input"
-          aria-label={`Regular expression for ${column}`}
-          placeholder="^[6-9][0-9]{9}$"
-          spellCheck={false}
-          value={pattern}
-          onChange={(e) => setPattern(e.target.value)}
-        />
-        <RegexVerdict check={check} />
-        {error && <ErrorAlert message={error} />}
-        <div className="row" style={{ gap: 8 }}>
-          <button type="button" className="btn" disabled={busy || !check?.valid} onClick={showPreview}>
-            <Icon name="search" size={14} /> Preview
-          </button>
-          <button type="button" className="btn btn-primary" disabled={busy || !previewed} onClick={apply}>
-            <Icon name="check" size={14} /> Apply
-          </button>
-          {applied && (
-            <button type="button" className="btn" disabled={busy} onClick={remove}>
-              Remove rule
-            </button>
-          )}
-        </div>
-        {!previewed && <p className="text-sm muted">Preview first. Nothing changes until you click Apply.</p>}
-        {preview && previewed && <PreviewRows result={preview.result} />}
+      <div className="rule-steps">
+        <Step n={1} title="Get a regex">
+          <GetRegex code={code} table={table} column={column} library={library} onUse={setPattern} />
+        </Step>
+        <Step n={2} title="Your regex">
+          <div className="stack" style={{ gap: 6 }}>
+            <input
+              className="input regex-input"
+              aria-label={`Regular expression for ${column}`}
+              placeholder="Use a suggestion above, or type a regex here"
+              spellCheck={false}
+              value={pattern}
+              onChange={(e) => setPattern(e.target.value)}
+            />
+            <RegexVerdict check={check} />
+          </div>
+        </Step>
+        <Step n={3} title="Preview and apply">
+          <div className="stack" style={{ gap: 10 }}>
+            {error && <ErrorAlert message={error} />}
+            <div className="row" style={{ gap: 8 }}>
+              <button type="button" className="btn" disabled={busy || !check?.valid} onClick={showPreview}>
+                <Icon name="search" size={14} /> Preview
+              </button>
+              <button type="button" className="btn btn-primary" disabled={busy || !previewed} onClick={apply}>
+                <Icon name="check" size={14} /> Apply
+              </button>
+              {applied && (
+                <button type="button" className="btn" disabled={busy} onClick={remove}>
+                  Remove rule
+                </button>
+              )}
+            </div>
+            {!previewed && <p className="text-sm muted">Preview first. Nothing changes until you click Apply.</p>}
+            {preview && previewed && <PreviewRows result={preview.result} />}
+          </div>
+        </Step>
       </div>
     </Card>
   )

@@ -28,11 +28,13 @@ TIMEOUT = 25  # seconds for one answer from the model
 
 SYSTEM = (
     "You write one regular expression that checks the values of one column in a bank's data table. "
-    'Reply with JSON only, exactly like {"pattern": "...", "explanation": "..."}. '
+    'Reply with JSON only, exactly like {"pattern": "...", "explanation": "...", "valid_examples": ["...", "..."], '
+    '"invalid_examples": [{"value": "...", "why": "..."}, {"value": "...", "why": "..."}]}. '
     "The pattern must describe the correct format, so wrong values in the column fail it. It must match the whole "
     "value, start with ^ and end with $, and use Python regex syntax. The explanation is one short sentence in plain "
-    "English for someone who does not know regex. In the shapes you are given, A is a capital letter, a is a small "
-    "letter and 9 is a digit; every other character is itself."
+    "English for someone who does not know regex. Give 2 made-up values that match and 2 made-up values that do not, "
+    "each with a few words on why it fails; never copy real data. In the shapes you are given, A is a capital letter, a "
+    "is a small letter and 9 is a digit; every other character is itself."
 )
 
 
@@ -91,13 +93,31 @@ def _ask(messages):
 
 
 def _read(answer):
-    """(pattern, explanation) from the model's JSON answer."""
+    """The model's JSON answer as a dict ({} when it is not JSON)."""
     found = re.search(r"\{.*\}", answer or "", re.S)
     try:
         data = json.loads(found.group()) if found else {}
     except ValueError:
         data = {}
-    return str(data.get("pattern") or "").strip(), str(data.get("explanation") or "").strip()
+    return data if isinstance(data, dict) else {}
+
+
+def examples(compiled, data):
+    """(matching, failing) made-up examples, sorted by what the regex really does, not by what the model said:
+    a small model sometimes puts an example on the wrong side. failing: [{value, why}]."""
+    offered = [(str(v), "") for v in data.get("valid_examples") or [] if isinstance(v, (str, int))]
+    for item in data.get("invalid_examples") or []:
+        if isinstance(item, dict):
+            offered.append((str(item.get("value", "")), str(item.get("why", "")).strip()))
+        elif isinstance(item, (str, int)):
+            offered.append((str(item), ""))
+    matching, failing = [], []
+    for value, why in offered[:8]:
+        if compiled.fullmatch(value):
+            matching.append(value)
+        else:
+            failing.append({"value": value, "why": why})
+    return matching[:3], failing[:3]
 
 
 def suggest(table, column, wish=""):
@@ -110,13 +130,15 @@ def suggest(table, column, wish=""):
     messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": ask}]
     for attempt in range(2):
         answer = _ask(messages)
-        pattern, explanation = _read(answer)
+        data = _read(answer)
+        pattern, explanation = str(data.get("pattern") or "").strip(), str(data.get("explanation") or "").strip()
         try:
             tested = preview(table, column, pattern)
         except RuleError as exc:
             messages += [{"role": "assistant", "content": answer},
                          {"role": "user", "content": f"That pattern does not work: {exc} Reply again with JSON."}]
             continue
-        return {"pattern": pattern, "explanation": explanation, "passed": tested["passed"],
-                "failed": tested["failed"], "total": tested["total"]}
+        matching, failing = examples(compile_rule(pattern), data)
+        return {"pattern": pattern, "explanation": explanation, "matching": matching, "failing": failing,
+                "passed": tested["passed"], "failed": tested["failed"], "total": tested["total"]}
     raise AiError("The AI could not write a working regex for this column. Try describing the rule in words.")

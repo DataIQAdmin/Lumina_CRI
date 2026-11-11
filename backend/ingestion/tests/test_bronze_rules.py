@@ -206,6 +206,7 @@ def test_ready_regexes_are_proper_and_match_their_examples():
     assert len({r["pattern"] for r in READY_REGEXES}) == len(READY_REGEXES)
     for ready in READY_REGEXES:
         assert compile_rule(ready["pattern"]).fullmatch(ready["example"]), ready["name"]
+        assert not compile_rule(ready["pattern"]).fullmatch(ready["bad"][0]), ready["name"]
 
 
 def test_library_keeps_saved_regexes(admin, db):
@@ -237,11 +238,15 @@ def test_ai_helper_sends_shapes_not_values_and_returns_a_tested_regex(admin, cod
 
     def ask(messages):
         sent.append(messages)
-        return '{"pattern": "^[A-Z]{5}[0-9]{4}[A-Z]$", "explanation": "Five capitals, four digits, one capital."}'
+        return ('{"pattern": "^[A-Z]{5}[0-9]{4}[A-Z]$", "explanation": "Five capitals, four digits, one capital.", '
+                '"valid_examples": ["ABCPK1234F", "abcpk1234f"], '
+                '"invalid_examples": [{"value": "ABCPK1234", "why": "last letter missing"}]}')
 
     monkeypatch.setattr("ingestion.regex_ai._ask", ask)
     body = admin.post(f"/api/rules/{code}/suggest/", {"table": TABLE, "column": "PAN"}, format="json").json()
     assert body == {"pattern": "^[A-Z]{5}[0-9]{4}[A-Z]$", "explanation": "Five capitals, four digits, one capital.",
+                    "matching": ["ABCPK1234F"],  # the model's wrong "valid" example is moved to the failing side
+                    "failing": [{"value": "abcpk1234f", "why": ""}, {"value": "ABCPK1234", "why": "last letter missing"}],
                     "passed": 1, "failed": 2, "total": 3}
     told = str(sent)
     assert "AAAAA9999A" in told and "ABCDE1234F" not in told and "abcde1234f" not in told
@@ -276,3 +281,20 @@ def test_ai_helper_says_why_the_model_api_failed(admin, code, settings, monkeypa
     monkeypatch.setattr("urllib.request.urlopen", refuse)
     response = admin.post(f"/api/rules/{code}/suggest/", {"table": TABLE, "column": "PAN"}, format="json")
     assert response.status_code == 400 and "HTTP 401" in response.json()["detail"]
+
+
+def test_every_count_can_show_the_rows_behind_it(admin, code):
+    phone = admin.get(f"/api/raw/{code}/proof/", {"table": TABLE, "column": "Phone", "label": "9 digits"}).json()
+    assert phone["count"] == 1 and phone["key"] == "CustomerID"
+    assert phone["results"] == [{"row": 2, "key": "C2", "value": "987654321"}]
+    empty = admin.get(f"/api/raw/{code}/proof/", {"table": TABLE, "column": "PAN", "label": "Empty"}).json()
+    assert [r["key"] for r in empty["results"]] == ["C3"]
+    pan = admin.get(f"/api/raw/{code}/proof/", {"table": TABLE, "column": "PAN", "label": "10 characters"}).json()
+    assert [r["value"] for r in pan["results"]] == ["XXXXXX234F", "XXXXXX234f"]  # counted on the real value, shown masked
+    columns = {c["name"]: c for c in admin.get(f"/api/raw/{code}/profile/", {"table": TABLE}).json()["profile"]["columns"]}
+    for name in ["Phone", "PAN", "EmailAddress"]:  # every count adds up to the rows the proof finds
+        for c in columns[name]["counts"]:
+            got = admin.get(f"/api/raw/{code}/proof/", {"table": TABLE, "column": name, "label": c["label"]}).json()
+            assert got["count"] == c["count"], (name, c)
+    agent = client("proof.agent", group="Contact centre agent")
+    assert agent.get(f"/api/raw/{code}/proof/", {"table": TABLE, "column": "Phone", "label": "Empty"}).status_code == 403

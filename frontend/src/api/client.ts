@@ -31,6 +31,7 @@ import type {
   TableRemoval,
   ProfilingSummary,
   ProfiledRecords,
+  CountProof,
   RawSources,
   RawTable,
   RawTableProfile,
@@ -227,6 +228,10 @@ export const api = {
   rawTables: (code: string) => get<{ code: string; name: string; tables: RawTable[] }>(`/raw/${code}/`),
   rawDiscover: (code: string) => post<{ tables: string[]; dropped: number }>(`/raw/${code}/discover/`),
   rawRead: (code: string, table: string) => post<RawTable>(`/raw/${code}/read/`, { table }),
+  rawProof: (code: string, table: string, column: string, label: string, page: number) =>
+    get<CountProof>(
+      `/raw/${code}/proof/?${new URLSearchParams({ table, column, label, page: String(page) })}`,
+    ),
   rawProfile: (code: string, table: string) =>
     get<RawTableProfile>(`/raw/${code}/profile/?table=${encodeURIComponent(table)}`),
   ruleColumns: (code: string, table: string) =>
