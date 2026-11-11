@@ -589,6 +589,15 @@ export interface RuleColumns {
   columns: { name: string; pattern: string }[]
 }
 
+// What the AI helper suggests for a column, already checked and tested there (backend ingestion/regex_ai.py).
+export interface RegexSuggestion {
+  pattern: string
+  explanation: string
+  passed: number
+  failed: number
+  total: number
+}
+
 export interface RulePreview {
   total: number
   passed: number

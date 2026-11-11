@@ -7,12 +7,14 @@ also need view_pii.
 """
 
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
 
 from audit.models import AuditEvent
 from audit.services import record
 from ingestion.models import ColumnRule, RawTable, SavedRegex
+from ingestion.regex_ai import AiError
+from ingestion.regex_ai import suggest as ai_suggest
 from ingestion.regex_library import READY_REGEXES
 from ingestion.rules import RuleError, compile_rule, split, table_rules
 from ingestion.rules import preview as preview_rule
@@ -20,6 +22,7 @@ from ingestion.rules import test_table as test_rule
 from sources.models import Source
 
 from .permissions import HasRole, requires
+from .throttles import AiThrottle
 from .raw_views import PAGE_SIZE
 
 RULES = [HasRole, requires("manage_sources")]
@@ -81,6 +84,24 @@ def remove(request, code):
     if gone:
         record(request, AuditEvent.CONNECTOR_CHANGED, target=f"source {code}", rule_removed=f"{name}.{column}")
     return Response({"removed": gone})
+
+
+@api_view(["POST"])
+@permission_classes(RULES)
+@throttle_classes([AiThrottle])
+def suggest(request, code):
+    """POST /api/rules/<code>/suggest/  {table, column, wish?}  Ask the AI helper for a regex. It comes back already
+    checked and tested on the column; nothing is applied. Only value shapes are sent to the AI, never values."""
+    name, column, _ = _column_from(request)
+    table, error = _table_from(code, name)
+    if error:
+        return error
+    if column not in table.columns:
+        return _bad("This table has no such column.")
+    try:
+        return Response(ai_suggest(table, column, str(request.data.get("wish") or "")))
+    except AiError as exc:
+        return _bad(str(exc))  # not 503: the screen reads 502-504 as "the server is waking up" and waits
 
 
 @api_view(["POST"])

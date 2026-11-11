@@ -23,6 +23,8 @@ services:
         sync: false
       - key: FIELD_ENCRYPTION_KEY
         sync: false
+      - key: LLM_API_KEY
+        sync: false  # the AI regex helper; free key from console.groq.com. Empty turns the helper off.
       - key: CSRF_TRUSTED_ORIGINS
         sync: false
       - key: SYNC_RUNNER_TOKEN

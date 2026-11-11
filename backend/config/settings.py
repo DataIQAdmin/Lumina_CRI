@@ -177,6 +177,12 @@ FIELD_ENCRYPTION_KEY = os.getenv('FIELD_ENCRYPTION_KEY', '')
 CONNECTORS_ALLOW_PRIVATE_HOSTS = os.getenv('CONNECTORS_ALLOW_PRIVATE_HOSTS', str(DEBUG)).lower() == 'true'
 # The most rows one sync reads from a source, and how long one query may run.
 CONNECTOR_MAX_ROWS = int(os.getenv('CONNECTOR_MAX_ROWS', '50000'))
+
+# The AI regex helper (ingestion/regex_ai.py): any OpenAI-compatible API, by default Groq's free tier. Without a
+# key the helper is off. The key is a secret: set it on the server, never in the repo.
+LLM_API_KEY = os.getenv('LLM_API_KEY', '')
+LLM_BASE_URL = os.getenv('LLM_BASE_URL', 'https://api.groq.com/openai/v1')
+LLM_MODEL = os.getenv('LLM_MODEL', 'llama-3.1-8b-instant')
 CONNECTOR_TIMEOUT_SECONDS = int(os.getenv('CONNECTOR_TIMEOUT_SECONDS', '30'))
 
 # Synthetic demo data, one folder per organization: fake_sources/<schema>/ holds that bank's core banking
@@ -205,7 +211,7 @@ REST_FRAMEWORK = {
     # Sign-in has its own tighter limit on top of the account lockout (accounts/lockout.py).
     'DEFAULT_THROTTLE_CLASSES': ['rest_framework.throttling.AnonRateThrottle',
                                  'rest_framework.throttling.UserRateThrottle'],
-    'DEFAULT_THROTTLE_RATES': {'anon': '60/min', 'user': '600/min', 'login': '10/min', 'ingest': '120/min'},
+    'DEFAULT_THROTTLE_RATES': {'anon': '60/min', 'user': '600/min', 'login': '10/min', 'ingest': '120/min', 'ai': '20/min'},
 }
 
 # Passwords are hashed with Argon2id. Older PBKDF2 hashes still work and are upgraded at the next sign-in.

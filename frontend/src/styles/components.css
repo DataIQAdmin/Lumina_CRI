@@ -5189,3 +5189,66 @@ button.link {
   overflow-wrap: anywhere;
   font-size: 12px;
 }
+
+/* Table names get their own line, the profiled date sits under them */
+.pick-tables .pick-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pick-tables .pick-text .pick-name {
+  overflow-wrap: normal;
+  word-break: break-word;
+}
+
+/* AI regex helper */
+.ai-helper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+
+.ai-helper-ask {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ai-helper-ask .input {
+  flex: 1;
+  min-width: 220px;
+}
+
+.ai-helper-answer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.ai-helper-answer code {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.ai-helper-answer p,
+.ai-helper p {
+  margin: 0;
+}
+
+.regex-browse summary {
+  cursor: pointer;
+  color: var(--text-3);
+}
+
+.regex-browse[open] summary {
+  margin-bottom: 8px;
+}

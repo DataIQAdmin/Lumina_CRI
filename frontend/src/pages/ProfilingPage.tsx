@@ -140,6 +140,19 @@ function ConnectorTables({ code, canRead, onProfiled }: { code: string; canRead:
             </button>
           ) : (
             <div className="row" style={{ gap: 8 }}>
+              {done.length > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  disabled={progress !== null}
+                  onClick={() => {
+                    setChanging(false)
+                    setTicked(new Set())
+                  }}
+                >
+                  Cancel
+                </button>
+              )}
               <button
                 type="button"
                 className="btn btn-sm"
@@ -193,9 +206,11 @@ function ConnectorTables({ code, canRead, onProfiled }: { code: string; canRead:
                       onChange={() => toggle(name)}
                     />
                   )}
-                  <span className="pick-name">{name}</span>
-                  <span className="text-xs muted">
-                    {when(name) ? `Profiled ${formatDateTime(when(name)!)}` : 'Not profiled'}
+                  <span className="pick-text">
+                    <span className="pick-name">{name}</span>
+                    <span className="text-xs muted">
+                      {when(name) ? `Profiled ${formatDateTime(when(name)!)}` : 'Not profiled'}
+                    </span>
                   </span>
                 </label>
               </li>
