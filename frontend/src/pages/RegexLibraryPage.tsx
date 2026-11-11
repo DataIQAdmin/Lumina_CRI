@@ -77,7 +77,10 @@ export function RegexLibraryPage() {
     top.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
   const shown = fits?.rows.filter((f) => f.matched > 0) ?? []
-  const entries = [...saved.map((r) => ({ ...r, example: '' })), ...ready.map((r) => ({ ...r, id: 0 }))]
+  const entries = [
+    ...saved.map((r) => ({ ...r, example: '', bad: ['', ''] as [string, string] })),
+    ...ready.map((r) => ({ ...r, id: 0 })),
+  ]
 
   return (
     <>
@@ -195,7 +198,8 @@ export function RegexLibraryPage() {
                 <tr>
                   <th>Name</th>
                   <th>Regex</th>
-                  <th>Example</th>
+                  <th>Valid</th>
+                  <th>Not valid</th>
                   <th />
                 </tr>
               </thead>
@@ -210,6 +214,9 @@ export function RegexLibraryPage() {
                       <code>{r.pattern}</code>
                     </td>
                     <td className="text-sm muted">{r.example}</td>
+                    <td className="text-sm muted" title={r.bad[1]}>
+                      {r.bad[0] || (r.bad[1] ? '(empty)' : '')}
+                    </td>
                     <td>
                       <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
                         <button type="button" className="btn btn-sm" onClick={() => tryIt(r.pattern)}>

@@ -76,6 +76,22 @@ def profile_column(column, values):
             "counts": _counts(column, filled), "values": _values(column, filled)}
 
 
+def label_of(column_profile, text):
+    """Which count of a profiled column a value falls in: "Empty", a length ("10 digits"), "Up to 50 characters",
+    one of the listed values, or "Other lengths". None when the column has no counts (free text)."""
+    text = _text(text)
+    if not text:
+        return "Empty"
+    counts = [c["label"] for c in column_profile.get("counts", [])]
+    if counts and counts[0].startswith("Up to "):
+        return counts[0] if len(text) <= EMAIL_LIMIT else counts[1]
+    if counts:
+        label = _length_label(text)
+        return label if label in counts else "Other lengths"
+    values = {v["label"] for v in column_profile.get("values") or []}
+    return text if text in values else None
+
+
 def profile_table(columns, rows):
     """The profile of one table from its readable rows (lists in column order)."""
     return {"rows": len(rows), "columns": [

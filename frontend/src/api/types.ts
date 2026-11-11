@@ -593,9 +593,22 @@ export interface RuleColumns {
 export interface RegexSuggestion {
   pattern: string
   explanation: string
+  matching: string[] // made-up examples, checked: they pass
+  failing: { value: string; why: string }[] // made-up examples, checked: they fail
   passed: number
   failed: number
   total: number
+}
+
+// The rows behind one count of the profile ("9 digits", "Empty"...), the proof that the count is real.
+export interface CountProof {
+  column: string
+  label: string
+  key: string // the table's first column, usually its ID
+  count: number
+  page: number
+  page_size: number
+  results: { row: number; key: unknown; value: unknown }[]
 }
 
 export interface RulePreview {
@@ -609,6 +622,7 @@ export interface ReadyRegex {
   name: string
   pattern: string
   example: string
+  bad: [string, string] // a value that fails, and why
   hints: string[]
 }
 

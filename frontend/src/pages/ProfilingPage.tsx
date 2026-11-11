@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { api } from '../api/client'
-import type { ColumnCounts } from '../api/types'
+import type { ColumnCounts, CountProof } from '../api/types'
 import { useApi } from '../api/useApi'
 import { ConnectorPicker } from '../components/ConnectorPicker'
 import { Icon } from '../components/Icon'
@@ -47,6 +47,7 @@ export function ProfilingPage() {
             key={chosen.code}
             code={chosen.code}
             canRead={sources.data?.can_read ?? false}
+            canViewRows={sources.data?.can_view_rows ?? false}
             onProfiled={sources.reload}
           />
         </>
@@ -55,7 +56,17 @@ export function ProfilingPage() {
   )
 }
 
-function ConnectorTables({ code, canRead, onProfiled }: { code: string; canRead: boolean; onProfiled: () => void }) {
+function ConnectorTables({
+  code,
+  canRead,
+  canViewRows,
+  onProfiled,
+}: {
+  code: string
+  canRead: boolean
+  canViewRows: boolean
+  onProfiled: () => void
+}) {
   const toast = useToast()
   const profiled = useApi(() => api.rawTables(code), [code])
   const [params, setParams] = useSearchParams()
@@ -237,7 +248,7 @@ function ConnectorTables({ code, canRead, onProfiled }: { code: string; canRead:
               ))}
             </div>
           )}
-          <Counts key={`${open.name}:${open.read_at}`} code={code} table={open.name} />
+          <Counts key={`${open.name}:${open.read_at}`} code={code} table={open.name} canViewRows={canViewRows} />
         </div>
       )}
     </>
@@ -265,7 +276,7 @@ function Tile({ label, value, note }: { label: string; value: string; note?: str
   )
 }
 
-function Counts({ code, table }: { code: string; table: string }) {
+function Counts({ code, table, canViewRows }: { code: string; table: string; canViewRows: boolean }) {
   const result = useApi(() => api.rawProfile(code, table), [code, table])
   const [filter, setFilter] = useState<Filter>('all')
   const [search, setSearch] = useState('')
@@ -298,7 +309,15 @@ function Counts({ code, table }: { code: string; table: string }) {
         <Tile label="Columns with empty values" value={n(withEmpty)} note={`of ${n(columns.length)}`} />
         <Tile label="Columns with mixed lengths" value={n(mixed)} note="Check these first" />
       </div>
-      <Card flush title={table} description={`Showing ${shown.length} of ${columns.length} columns`}>
+      <Card
+        flush
+        title={table}
+        description={
+          canViewRows
+            ? `Showing ${shown.length} of ${columns.length} columns. Click any count to see the rows behind it.`
+            : `Showing ${shown.length} of ${columns.length} columns`
+        }
+      >
         <div className="bronze-tools">
           <div className="pick-pills" role="group" aria-label="Filter columns">
             {FILTERS.map((f) => (
@@ -337,7 +356,7 @@ function Counts({ code, table }: { code: string; table: string }) {
               </thead>
               <tbody>
                 {shown.map((c) => (
-                  <CountsRow key={c.name} column={c} rows={rows} />
+                  <CountsRow key={c.name} code={code} table={table} column={c} rows={rows} canViewRows={canViewRows} />
                 ))}
               </tbody>
             </table>
@@ -356,40 +375,202 @@ function Bar({ share, title }: { share: number; title: string }) {
   )
 }
 
-function CountsRow({ column, rows }: { column: ColumnCounts; rows: number }) {
+// One count, clickable when the person may see values: it opens the rows behind it.
+function CountButton({
+  label,
+  count,
+  open,
+  canViewRows,
+  onOpen,
+  children,
+}: {
+  label: string
+  count: number
+  open: boolean
+  canViewRows: boolean
+  onOpen: () => void
+  children: ReactNode
+}) {
+  if (!canViewRows || count === 0) return <>{children}</>
+  return (
+    <button
+      type="button"
+      className={`count-button${open ? ' is-on' : ''}`}
+      aria-expanded={open}
+      title={`See the ${n(count)} rows: ${label}`}
+      onClick={onOpen}
+    >
+      {children}
+    </button>
+  )
+}
+
+function CountsRow({
+  code,
+  table,
+  column,
+  rows,
+  canViewRows,
+}: {
+  code: string
+  table: string
+  column: ColumnCounts
+  rows: number
+  canViewRows: boolean
+}) {
+  const [open, setOpen] = useState<string | null>(null)
   const inside = column.counts.length ? column.counts : (column.values ?? [])
   const share = percent(column.filled, rows)
+  const toggle = (label: string) => setOpen(open === label ? null : label)
   return (
-    <tr>
-      <td>
-        <strong>{column.name}</strong>
-      </td>
-      <td>
-        <span className="bronze-filled">
-          <Bar share={share} title={`${n(column.filled)} of ${n(rows)} rows filled`} />
-          <span className="text-sm">{share}%</span>
-        </span>
-      </td>
-      <td className={`num${column.empty ? '' : ' muted'}`}>{n(column.empty)}</td>
-      <td className="num">{n(column.unique)}</td>
-      <td>
-        {inside.length ? (
-          <ul className="bronze-inside">
-            {inside.map((c) => (
-              <li key={c.label}>
-                <span>{c.label}</span>
-                <Bar
-                  share={percent(c.count, column.filled)}
-                  title={`${c.label}: ${n(c.count)} of ${n(column.filled)} filled values`}
-                />
-                <strong>{n(c.count)}</strong>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <span className="text-sm muted">Free text</span>
-        )}
-      </td>
-    </tr>
+    <>
+      <tr className={open ? 'is-open' : undefined}>
+        <td>
+          <strong>{column.name}</strong>
+        </td>
+        <td>
+          <span className="bronze-filled">
+            <Bar share={share} title={`${n(column.filled)} of ${n(rows)} rows filled`} />
+            <span className="text-sm">{share}%</span>
+          </span>
+        </td>
+        <td className={`num${column.empty ? '' : ' muted'}`}>
+          <CountButton
+            label="Empty"
+            count={column.empty}
+            open={open === 'Empty'}
+            canViewRows={canViewRows}
+            onOpen={() => toggle('Empty')}
+          >
+            {n(column.empty)}
+          </CountButton>
+        </td>
+        <td className="num">{n(column.unique)}</td>
+        <td>
+          {inside.length ? (
+            <ul className="bronze-inside">
+              {inside.map((c) => (
+                <li key={c.label}>
+                  <CountButton
+                    label={c.label}
+                    count={c.count}
+                    open={open === c.label}
+                    canViewRows={canViewRows}
+                    onOpen={() => toggle(c.label)}
+                  >
+                    <span className="bronze-inside-row">
+                      <span>{c.label}</span>
+                      <Bar
+                        share={percent(c.count, column.filled)}
+                        title={`${c.label}: ${n(c.count)} of ${n(column.filled)} filled values`}
+                      />
+                      <strong>{n(c.count)}</strong>
+                    </span>
+                  </CountButton>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <span className="text-sm muted">Free text</span>
+          )}
+        </td>
+      </tr>
+      {open && (
+        <tr className="proof-row">
+          <td colSpan={5}>
+            <Proof code={code} table={table} column={column.name} label={open} onClose={() => setOpen(null)} />
+          </td>
+        </tr>
+      )}
+    </>
+  )
+}
+
+// The rows behind one count: row number, the table's ID and the value itself, 20 at a time.
+function Proof({
+  code,
+  table,
+  column,
+  label,
+  onClose,
+}: {
+  code: string
+  table: string
+  column: string
+  label: string
+  onClose: () => void
+}) {
+  const [page, setPage] = useState(1)
+  const [data, setData] = useState<CountProof | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  useEffect(() => {
+    let live = true
+    setError(null)
+    api.rawProof(code, table, column, label, page).then(
+      (got) => live && setData(got),
+      (e: Error) => live && setError(e.message),
+    )
+    return () => {
+      live = false
+    }
+  }, [code, table, column, label, page])
+  const pages = data ? Math.max(1, Math.ceil(data.count / data.page_size)) : 1
+  const shown = (v: unknown) => (v === null || v === undefined || v === '' ? <span className="muted">Empty</span> : String(v))
+
+  return (
+    <div className="proof">
+      <div className="proof-head">
+        <div className="stack" style={{ gap: 2 }}>
+          <strong>
+            {data ? n(data.count) : '...'} rows: {column} is {label === 'Empty' ? 'empty' : <q>{label}</q>}
+          </strong>
+          <span className="text-xs muted">Real rows from the table, so you can check the count yourself.</span>
+        </div>
+        <button type="button" className="btn btn-sm" onClick={onClose}>
+          Close
+        </button>
+      </div>
+      {error && <ErrorAlert message={error} />}
+      {!data && !error && <Loader kind="scan" label="Finding the rows" />}
+      {data && (
+        <>
+          <div className="table-wrap">
+            <table className="table proof-table">
+              <thead>
+                <tr>
+                  <th className="num">Row</th>
+                  <th>{data.key}</th>
+                  <th>{column}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.results.map((r) => (
+                  <tr key={r.row}>
+                    <td className="num muted">{r.row}</td>
+                    <td className="proof-key">{shown(r.key)}</td>
+                    <td>
+                      <code>{shown(r.value)}</code>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {pages > 1 && (
+            <div className="proof-pages">
+              <button type="button" className="btn btn-sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+                Previous
+              </button>
+              <span className="text-sm muted">
+                Page {page} of {pages}
+              </span>
+              <button type="button" className="btn btn-sm" disabled={page >= pages} onClick={() => setPage(page + 1)}>
+                Next
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
   )
 }

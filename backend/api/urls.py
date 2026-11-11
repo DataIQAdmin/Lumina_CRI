@@ -19,6 +19,7 @@ urlpatterns = [
     path("raw/<slug:code>/discover/", raw_views.discover),
     path("raw/<slug:code>/read/", raw_views.read),
     path("raw/<slug:code>/rows/", raw_views.rows),
+    path("raw/<slug:code>/proof/", raw_views.proof),
     path("raw/<slug:code>/profile/", raw_views.profile),
     path("rules/<slug:code>/", rule_views.rules),
     path("rules/<slug:code>/preview/", rule_views.preview),
