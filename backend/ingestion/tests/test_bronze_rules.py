@@ -298,3 +298,31 @@ def test_every_count_can_show_the_rows_behind_it(admin, code):
             assert got["count"] == c["count"], (name, c)
     agent = client("proof.agent", group="Contact centre agent")
     assert agent.get(f"/api/raw/{code}/proof/", {"table": TABLE, "column": "Phone", "label": "Empty"}).status_code == 403
+
+
+def test_tables_say_how_many_columns_need_a_look(admin, code):
+    table = admin.get(f"/api/raw/{code}/").json()["tables"][0]
+    assert table["mixed"] == 1  # Phone: 10, 9 and 7 digits
+    assert table["with_empty"] == 2  # EmailAddress and PAN
+
+
+def test_rules_list_shows_how_each_applied_rule_does(admin, code):
+    rule(admin, code, "Phone", r"\d{10}")
+    columns = {c["name"]: c for c in admin.get(f"/api/rules/{code}/", {"table": TABLE}).json()["columns"]}
+    assert (columns["Phone"]["passed"], columns["Phone"]["total"]) == (1, 3)
+    assert "passed" not in columns["PAN"]
+
+
+def test_silver_says_why_rows_were_rejected(admin, code):
+    rule(admin, code, "Phone", r"\d{9,10}")
+    rule(admin, code, "PAN", r"[A-Z]{5}\d{4}[A-Z]")
+    body = admin.get(f"/api/silver/{code}/rows/", {"table": TABLE, "show": "rejected"}).json()
+    assert body["reasons"] == [{"column": "PAN", "rows": 2}, {"column": "Phone", "rows": 1}]
+    only = admin.get(f"/api/silver/{code}/rows/", {"table": TABLE, "show": "rejected", "failed": "Phone"}).json()
+    assert [r["values"][0] for r in only["results"]] == ["C3"] and only["count"] == 1
+
+
+def test_pipeline_counts(admin, code):
+    assert admin.get("/api/pipeline/").json() == {"connectors": 1, "tables": 1, "rules": 0, "silver": 0}
+    rule(admin, code, "Phone", r"\d{9,10}")
+    assert admin.get("/api/pipeline/").json()["silver"] == 2

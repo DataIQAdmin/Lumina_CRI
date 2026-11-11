@@ -5,6 +5,7 @@ import { api } from '../api/client'
 import type { ReadyRegex, RegexCheck, RegexLibrary, RulePreview } from '../api/types'
 import { useApi } from '../api/useApi'
 import { ConnectorPicker } from '../components/ConnectorPicker'
+import { PipelineBar } from '../components/PipelineBar'
 import { Icon } from '../components/Icon'
 import { Loader } from '../components/Loader'
 import { useToast } from '../components/Toasts'
@@ -50,6 +51,7 @@ export function RulesPage() {
         title="Rules"
         description="Ask AI, pick or write a regular expression for a column, preview it, then apply it. Rows that pass go to silver."
       />
+      <PipelineBar />
       {sources.error && <ErrorAlert message={sources.error} />}
       {!sources.data && !sources.error && (
         <div className="card">
@@ -332,6 +334,8 @@ function Columns({ code, table }: { code: string; table: string }) {
   const list = columns.data?.columns ?? []
   const open = list.find((c) => c.name === params.get('column')) ?? list[0]
   const typed = params.get('regex') ?? ''
+  const [search, setSearch] = useState('')
+  const shown = list.filter((c) => c.name.toLowerCase().includes(search.trim().toLowerCase()))
 
   if (columns.error) return <ErrorAlert message={columns.error} />
   if (!columns.data || !open) {
@@ -345,8 +349,17 @@ function Columns({ code, table }: { code: string; table: string }) {
   return (
     <div className="rule-layout">
       <Card flush title="Columns" description={`${list.filter((c) => c.pattern).length} of ${list.length} have a rule`}>
+        <div className="rule-search">
+          <input
+            className="input input-sm"
+            aria-label="Search columns"
+            placeholder="Search columns"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
         <ul className="rule-columns">
-          {list.map((c) => (
+          {shown.map((c) => (
             <li key={c.name}>
               <button
                 type="button"
@@ -355,7 +368,12 @@ function Columns({ code, table }: { code: string; table: string }) {
                 onClick={() => pick(c.name)}
               >
                 <span className="pick-name">{c.name}</span>
-                {c.pattern && <Icon name="check" size={14} />}
+                {c.pattern && (
+                  <span className="rule-status" title={c.pattern}>
+                    <Icon name="check" size={13} />
+                    {c.total ? `${Math.round((100 * (c.passed ?? 0)) / c.total)}% pass` : 'Rule'}
+                  </span>
+                )}
               </button>
             </li>
           ))}

@@ -6,6 +6,8 @@ Rules, and a tester that tries one on every column so people can see where it fi
 also need view_pii.
 """
 
+from collections import Counter
+
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
@@ -57,8 +59,17 @@ def rules(request, code):
         if error:
             return error
         applied = table_rules(table)
-        return Response({"name": table.name, "rows": table.rows,
-                         "columns": [{"name": c, "pattern": applied.get(c, "")} for c in table.columns]})
+        columns = []
+        for c in table.columns:
+            entry = {"name": c, "pattern": applied.get(c, "")}
+            if entry["pattern"]:
+                try:
+                    tested = preview_rule(table, c, entry["pattern"])
+                    entry.update(passed=tested["passed"], total=tested["total"])
+                except RuleError:
+                    pass
+            columns.append(entry)
+        return Response({"name": table.name, "rows": table.rows, "columns": columns})
     name, column, pattern = _column_from(request)
     table, error = _table_from(code, name)
     if error:
@@ -208,8 +219,9 @@ def silver_tables(request, code):
 @api_view(["GET"])
 @permission_classes(ROWS)
 def silver_rows(request, code):
-    """GET /api/silver/<code>/rows/?table=<name>&page=1&show=passed|rejected  Rows, 50 at a time. Rejected rows
-    also say which columns failed."""
+    """GET /api/silver/<code>/rows/?table=<name>&page=1&show=passed|rejected&failed=<column>  Rows, 50 at a time.
+    Rejected rows also say which columns failed; failed=<column> keeps only rows that failed that column. reasons:
+    how many rows failed each column, most first."""
     table, error = _table_from(code, request.query_params.get("table"))
     if error:
         return error
@@ -221,11 +233,32 @@ def silver_rows(request, code):
         passed, rejected = split(table)
     except RuleError as exc:
         return _bad(str(exc))
+    reasons = Counter(c for _, _, broken in rejected for c in broken).most_common()
     if request.query_params.get("show") == "rejected":
-        chosen = [{"position": p, "values": v, "failed": broken} for p, v, broken in rejected]
+        only = request.query_params.get("failed")
+        chosen = [{"position": p, "values": v, "failed": broken} for p, v, broken in rejected
+                  if not only or only in broken]
     else:
         chosen = [{"position": p, "values": v, "failed": []} for p, v in passed]
     start = (page - 1) * PAGE_SIZE
     return Response({"column_names": table.columns, "rules": table_rules(table), "page": page,
                      "page_size": PAGE_SIZE, "count": len(chosen), "passed": len(passed), "rejected": len(rejected),
+                     "reasons": [{"column": c, "rows": count} for c, count in reasons],
                      "results": chosen[start:start + PAGE_SIZE]})
+
+
+@api_view(["GET"])
+@permission_classes([HasRole])
+def pipeline(request):
+    """GET /api/pipeline/  How far the data has come: connectors, profiled tables, rules and rows in silver."""
+    from ingestion.connectors.catalog import BY_TYPE
+
+    readable = [t for t, entry in BY_TYPE.items() if entry["adapter"] is not None]
+    silver = 0
+    for table in RawTable.objects.filter(source__column_rules__isnull=False).distinct().select_related("source"):
+        try:
+            silver += len(split(table)[0])
+        except RuleError:
+            pass
+    return Response({"connectors": Source.objects.filter(connector_type__in=readable).count(),
+                     "tables": RawTable.objects.count(), "rules": ColumnRule.objects.count(), "silver": silver})

@@ -31,8 +31,12 @@ def _source(code):
 
 
 def _table_json(t):
+    columns = (t.profile or {}).get("columns", [])
     return {"name": t.name, "columns": len(t.columns), "rows": t.rows, "complete": t.complete,
-            "sensitive": t.sensitive, "read_at": t.read_at.isoformat()}
+            "sensitive": t.sensitive, "read_at": t.read_at.isoformat(),
+            # how many columns need a look: mixed lengths, or empty values
+            "mixed": sum(1 for c in columns if sum(1 for x in c.get("counts", []) if x["count"]) > 1),
+            "with_empty": sum(1 for c in columns if c.get("empty"))}
 
 
 @api_view(["GET"])
