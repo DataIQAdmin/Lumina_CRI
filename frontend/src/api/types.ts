@@ -562,6 +562,8 @@ export interface RawTable {
   complete: boolean
   sensitive: string[]
   read_at: string
+  filled?: number // % of the table's values that are filled
+  to_check?: number // columns with empty values, mixed lengths or too-long emails
   mixed: number // columns with mixed lengths
   with_empty: number // columns with empty values
 }
@@ -630,6 +632,7 @@ export interface RulePreview {
 export interface ReadyRegex {
   name: string
   pattern: string
+  group: string // Identity, Contact, Codes, Dates...
   example: string
   bad: [string, string] // a value that fails, and why
   hints: string[]

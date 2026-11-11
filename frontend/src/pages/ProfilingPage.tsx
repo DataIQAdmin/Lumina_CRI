@@ -1,73 +1,71 @@
-import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { api } from '../api/client'
-import type { ColumnCounts, CountProof } from '../api/types'
+import type { ColumnCounts, CountProof, RawTable } from '../api/types'
 import { useApi } from '../api/useApi'
-import { ConnectorPicker } from '../components/ConnectorPicker'
-import { PipelineBar } from '../components/PipelineBar'
 import { Icon } from '../components/Icon'
 import { Loader } from '../components/Loader'
-import { Card, EmptyState, ErrorAlert, PageHeader } from '../components/ui'
+import { Legend, n, PanelHead, pct, Pill, Ring, Seg, Split, type Part } from '../components/Lx'
+import { EmptyState, ErrorAlert, PageHeader } from '../components/ui'
 import { formatDateTime } from '../format'
 import { profileJob } from '../profileJob'
 
-const n = (v: number) => v.toLocaleString('en-IN')
-
-// Bronze layer: pick a connector, tick the tables to profile, and see plain counts for each column of those
-// tables. Only ticked tables are read. The chosen connector and table live in the address.
+// Bronze layer: tables on the left, the chosen table's columns on the right. Tables are profiled only when chosen
+// (ChooseTables), as a job with its own progress (ProfileJobPanel). Connector and table live in the address.
 export function ProfilingPage() {
   const sources = useApi(() => api.rawSources(), [])
   const [params, setParams] = useSearchParams()
   const list = sources.data?.sources ?? []
   const chosen = list.find((s) => s.code === params.get('source')) ?? list[0]
 
-  return (
-    <>
-      <PageHeader
-        title="Data profiling"
-        description="Choose a connector, choose its tables, and see the counts for each column."
-      />
-      <PipelineBar />
-      {sources.error && <ErrorAlert message={sources.error} />}
-      {!sources.data && !sources.error && (
-        <div className="card">
-          <Loader kind="scan" label="Loading connectors" />
-        </div>
-      )}
-      {sources.data && !chosen && (
-        <Card>
+  if (sources.error) return <ErrorAlert message={sources.error} />
+  if (!sources.data) {
+    return (
+      <div className="lx-panel">
+        <Loader kind="scan" label="Loading connectors" />
+      </div>
+    )
+  }
+  if (!chosen) {
+    return (
+      <>
+        <PageHeader title="Data profiling" />
+        <div className="lx-panel">
           <EmptyState icon="connectors" title="No connectors yet">
-            Add a connector first. Its tables will appear here.
+            Add a connector first.
           </EmptyState>
-        </Card>
-      )}
-      {chosen && (
-        <>
-          <ConnectorPicker sources={list} chosen={chosen.code} onChoose={(code) => setParams({ source: code })} />
-          <ConnectorTables
-            key={chosen.code}
-            code={chosen.code}
-            source={chosen.name}
-            canRead={sources.data?.can_read ?? false}
-            canViewRows={sources.data?.can_view_rows ?? false}
-            onProfiled={sources.reload}
-          />
-        </>
-      )}
-    </>
+        </div>
+      </>
+    )
+  }
+  return (
+    <Connector
+      key={chosen.code}
+      code={chosen.code}
+      name={chosen.name}
+      sources={list.map((s) => ({ value: s.code, label: s.name }))}
+      onSource={(code) => setParams({ source: code })}
+      canRead={sources.data.can_read}
+      canViewRows={sources.data.can_view_rows}
+      onProfiled={sources.reload}
+    />
   )
 }
 
-function ConnectorTables({
+function Connector({
   code,
-  source,
+  name,
+  sources,
+  onSource,
   canRead,
   canViewRows,
   onProfiled,
 }: {
   code: string
-  source: string
+  name: string
+  sources: { value: string; label: string }[]
+  onSource: (code: string) => void
   canRead: boolean
   canViewRows: boolean
   onProfiled: () => void
@@ -75,394 +73,367 @@ function ConnectorTables({
   const profiled = useApi(() => api.rawTables(code), [code])
   const [params, setParams] = useSearchParams()
   const [names, setNames] = useState<string[] | null>(null)
-  const [listError, setListError] = useState<string | null>(null)
-  const [ticked, setTicked] = useState<Set<string>>(new Set())
+  const [choosing, setChoosing] = useState(false)
   const job = useSyncExternalStore(profileJob.subscribe, profileJob.get)
-  const busy = !!job && job.finished === null
-  const results = useRef<HTMLDivElement>(null)
-  const [changing, setChanging] = useState(false) // the table list folds away once something is profiled
 
   useEffect(() => {
     if (!canRead) return
-    api
-      .rawDiscover(code)
-      .then((found) => setNames(found.tables))
-      .catch((e: Error) => setListError(e.message))
+    api.rawDiscover(code).then((found) => setNames(found.tables), () => setNames([]))
   }, [code, canRead])
 
-  const done = profiled.data?.tables ?? []
-  const open = done.find((t) => t.name === params.get('table')) ?? done[0]
-  const all = names ?? done.map((t) => t.name)
-  const when = (name: string) => done.find((t) => t.name === name)?.read_at
-
-  const toggle = (name: string) =>
-    setTicked((old) => {
-      const next = new Set(old)
-      if (next.has(name)) next.delete(name)
-      else next.add(name)
-      return next
-    })
-
-  // The job reads one table at a time and shows its own progress (ProfileJobPanel). When a job on this connector
-  // ends, show its results here.
-  const profile = () => {
-    profileJob.start(code, source, all.filter((name) => ticked.has(name)))
-    setTicked(new Set())
-  }
+  // When a job on this connector ends, show what it profiled.
   const ended = job && job.code === code ? job.finished : null
   useEffect(() => {
     if (!ended) return
-    setChanging(false)
     profiled.reload()
     onProfiled()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ended])
 
-  const folded = done.length > 0 && !changing
+  const done = profiled.data?.tables ?? []
+  const open = done.find((t) => t.name === params.get('table')) ?? done[0]
+  const all = names ?? done.map((t) => t.name)
 
   return (
     <>
-      <Card
-        flush
-        title={folded ? `${done.length} of ${all.length} tables profiled` : 'Choose tables'}
-        description={
-          canRead
-            ? folded
-              ? 'Open the list to profile more tables.'
-              : 'Only the tables you tick are profiled.'
-            : 'A data steward or administrator profiles tables.'
-        }
+      <PageHeader
+        title="Data profiling"
+        description={`${name} · ${done.length} of ${all.length || done.length} tables profiled`}
         actions={
-          canRead &&
-          (folded ? (
-            <button type="button" className="btn btn-sm" onClick={() => setChanging(true)}>
-              Change tables
-            </button>
-          ) : (
-            <div className="row" style={{ gap: 8 }}>
-              {done.length > 0 && (
-                <button
-                  type="button"
-                  className="btn btn-sm"
-                  disabled={busy}
-                  onClick={() => {
-                    setChanging(false)
-                    setTicked(new Set())
-                  }}
-                >
-                  Cancel
-                </button>
-              )}
-              <button
-                type="button"
-                className="btn btn-sm"
-                disabled={!all.length || busy}
-                onClick={() => setTicked(ticked.size === all.length ? new Set() : new Set(all))}
-              >
-                {ticked.size === all.length && all.length ? 'Clear all' : 'Select all'}
+          <>
+            {sources.length > 1 && <Seg label="Connector" value={code} options={sources} onChange={onSource} />}
+            {canRead && (
+              <button type="button" className="btn btn-primary" onClick={() => setChoosing(true)}>
+                <Icon name="search" size={15} /> Choose tables
               </button>
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                disabled={!ticked.size || busy}
-                onClick={profile}
-              >
-                <Icon name="search" size={14} /> Profile selected{ticked.size ? ` (${ticked.size})` : ''}
-              </button>
-            </div>
-          ))
+            )}
+          </>
         }
-      >
-        {listError && <ErrorAlert message={listError} />}
-        {canRead && names === null && !listError && <Loader kind="scan" label="Asking the connector for its tables" />}
-        {names !== null && all.length === 0 && (
-          <EmptyState icon="search" title="No tables found">
-            This connector has no tables yet.
+      />
+      {profiled.error && <ErrorAlert message={profiled.error} />}
+      {profiled.data && !open && (
+        <div className="lx-panel">
+          <EmptyState icon="search" title="Nothing profiled yet">
+            {canRead ? 'Choose the tables to profile.' : 'A data steward or administrator profiles tables.'}
           </EmptyState>
-        )}
-        {all.length > 0 && !folded && (
-          <ul className="pick-tables">
-            {all.map((name) => (
-              <li key={name}>
+        </div>
+      )}
+      {open && (
+        <div className="lx-two">
+          <div className="lx-panel">
+            <PanelHead title="Tables" aside={<span className="muted text-sm">{done.length}</span>} />
+            <div className="lx-list lx-scroll">
+              {done.map((t) => (
+                <button
+                  key={t.name}
+                  type="button"
+                  className={t.name === open.name ? 'is-on' : undefined}
+                  aria-pressed={t.name === open.name}
+                  onClick={() => setParams({ source: code, table: t.name })}
+                >
+                  <Ring value={t.filled ?? 100} label={String(t.filled ?? 100)} />
+                  <span className="lx-grow">
+                    <strong>{t.name}</strong>
+                    <small>{t.to_check ? `${t.to_check} to check` : 'All fine'}</small>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <TableView key={`${open.name}:${open.read_at}`} code={code} table={open} canViewRows={canViewRows} />
+        </div>
+      )}
+      {choosing && (
+        <ChooseTables
+          code={code}
+          name={name}
+          tables={all}
+          profiledAt={(t) => done.find((d) => d.name === t)?.read_at}
+          loading={names === null}
+          onClose={() => setChoosing(false)}
+        />
+      )}
+    </>
+  )
+}
+
+function ChooseTables({
+  code,
+  name,
+  tables,
+  profiledAt,
+  loading,
+  onClose,
+}: {
+  code: string
+  name: string
+  tables: string[]
+  profiledAt: (table: string) => string | undefined
+  loading: boolean
+  onClose: () => void
+}) {
+  const [ticked, setTicked] = useState<Set<string>>(new Set())
+  const busy = useSyncExternalStore(profileJob.subscribe, profileJob.running)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+  const toggle = (t: string) =>
+    setTicked((old) => {
+      const next = new Set(old)
+      if (next.has(t)) next.delete(t)
+      else next.add(t)
+      return next
+    })
+  const start = () => {
+    profileJob.start(code, name, tables.filter((t) => ticked.has(t)))
+    onClose()
+  }
+  return (
+    <div className="job-overlay" onClick={onClose}>
+      <section
+        className="job-dialog lx-choose"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="choose-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="job-head">
+          <h2 id="choose-title">Choose tables</h2>
+          <span className="text-sm muted">{name}</span>
+        </header>
+        {loading ? (
+          <Loader kind="scan" label="Asking the connector for its tables" />
+        ) : (
+          <ul className="lx-checks">
+            {tables.map((t) => (
+              <li key={t}>
                 <label>
-                  {canRead && (
-                    <input
-                      type="checkbox"
-                      checked={ticked.has(name)}
-                      disabled={busy}
-                      onChange={() => toggle(name)}
-                    />
-                  )}
-                  <span className="pick-text">
-                    <span className="pick-name">{name}</span>
-                    <span className="text-xs muted">
-                      {when(name) ? `Profiled ${formatDateTime(when(name)!)}` : 'Not profiled'}
-                    </span>
+                  <input type="checkbox" checked={ticked.has(t)} onChange={() => toggle(t)} />
+                  <span>
+                    <strong>{t}</strong>
+                    <small>{profiledAt(t) ? `Profiled ${formatDateTime(profiledAt(t)!)}` : 'Not profiled'}</small>
                   </span>
                 </label>
               </li>
             ))}
           </ul>
         )}
-      </Card>
-
-      {profiled.error && <ErrorAlert message={profiled.error} />}
-      {open && (
-        <div ref={results} className="pick-results profiled-layout">
-          <Card flush title="Profiled tables" description={`${done.length} of ${all.length}`}>
-            <ul className="profiled-list">
-              {done.map((t) => (
-                <li key={t.name}>
-                  <button
-                    type="button"
-                    className={t.name === open.name ? 'is-on' : ''}
-                    aria-pressed={t.name === open.name}
-                    onClick={() => setParams({ source: code, table: t.name })}
-                  >
-                    <span className="pick-name">{t.name}</span>
-                    <span className="text-xs muted">
-                      {n(t.rows)} rows
-                      {t.mixed ? ` · ${t.mixed} mixed` : ''}
-                      {t.with_empty ? ` · ${t.with_empty} with empty` : ''}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </Card>
-          <div className="profiled-main">
-            <Counts key={`${open.name}:${open.read_at}`} code={code} table={open.name} canViewRows={canViewRows} />
-          </div>
-        </div>
-      )}
-    </>
-  )
-}
-
-type Filter = 'all' | 'empty' | 'mixed'
-
-const FILTERS: { value: Filter; label: string }[] = [
-  { value: 'all', label: 'All columns' },
-  { value: 'empty', label: 'Has empty values' },
-  { value: 'mixed', label: 'Mixed lengths' },
-]
-
-const isMixed = (c: ColumnCounts) => c.counts.filter((x) => x.count > 0).length > 1
-const percent = (part: number, whole: number) => (whole ? Math.round((100 * part) / whole) : 0)
-
-function Tile({ label, value, note }: { label: string; value: string; note?: string }) {
-  return (
-    <div className="bronze-tile">
-      <span className="text-sm muted">{label}</span>
-      <strong>{value}</strong>
-      {note && <span className="text-xs muted">{note}</span>}
+        <footer className="job-foot">
+          <button
+            type="button"
+            className="btn"
+            style={{ marginRight: 'auto' }}
+            onClick={() => setTicked(ticked.size === tables.length ? new Set() : new Set(tables))}
+          >
+            {ticked.size === tables.length && tables.length ? 'Clear all' : 'Select all'}
+          </button>
+          <button type="button" className="btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="button" className="btn btn-primary" disabled={!ticked.size || busy} onClick={start}>
+            Profile {ticked.size || ''} {ticked.size === 1 ? 'table' : 'tables'}
+          </button>
+        </footer>
+      </section>
     </div>
   )
 }
 
-function Counts({ code, table, canViewRows }: { code: string; table: string; canViewRows: boolean }) {
-  const result = useApi(() => api.rawProfile(code, table), [code, table])
+type Filter = 'all' | 'check' | 'fine'
+
+const isEmail = (c: ColumnCounts) => !!c.counts[0]?.label.startsWith('Up to')
+const isMixed = (c: ColumnCounts) => !isEmail(c) && c.counts.filter((x) => x.count > 0).length > 1
+const tooLong = (c: ColumnCounts) => isEmail(c) && (c.counts[1]?.count ?? 0) > 0
+const needsLook = (c: ColumnCounts) => c.empty > 0 || isMixed(c) || tooLong(c)
+
+function status(c: ColumnCounts, rows: number): { tone: 'ok' | 'warn' | 'bad'; text: string } {
+  if (c.empty > 0) return { tone: 'bad', text: `${pct(c.empty, rows)}% empty` }
+  if (tooLong(c)) return { tone: 'warn', text: 'Too long' }
+  if (isMixed(c)) return { tone: 'warn', text: 'Mixed lengths' }
+  return { tone: 'ok', text: 'Looks fine' }
+}
+
+// The parts of a column for its split bar: its lengths or its values. The rarer lengths and too-long emails show
+// as warnings.
+function partsOf(c: ColumnCounts): Part[] {
+  if (c.counts.length) {
+    return c.counts.map((x, i) => ({
+      label: x.label,
+      count: x.count,
+      tone: (isEmail(c) ? i === 1 : i > 0) ? ('warn' as const) : undefined,
+    }))
+  }
+  return (c.values ?? []).map((x) => ({ label: x.label, count: x.count }))
+}
+
+function TableView({ code, table, canViewRows }: { code: string; table: RawTable; canViewRows: boolean }) {
+  const result = useApi(() => api.rawProfile(code, table.name), [code, table.name])
   const [filter, setFilter] = useState<Filter>('all')
   const [search, setSearch] = useState('')
+  const [open, setOpen] = useState<{ column: string; label: string } | null>(null)
   if (result.error) return <ErrorAlert message={result.error} />
   if (!result.data) {
     return (
-      <div className="card">
+      <div className="lx-panel">
         <Loader kind="scan" label="Loading the counts" />
       </div>
     )
   }
   const { rows, columns } = result.data.profile
-  const cells = rows * columns.length
-  const filled = columns.reduce((sum, c) => sum + c.filled, 0)
-  const withEmpty = columns.filter((c) => c.empty > 0).length
-  const mixed = columns.filter(isMixed).length
+  const empty = columns.reduce((sum, c) => sum + c.empty, 0)
+  const check = columns.filter(needsLook)
   const term = search.trim().toLowerCase()
   const shown = columns.filter(
     (c) =>
-      c.name.toLowerCase().includes(term) &&
-      (filter === 'all' || (filter === 'empty' ? c.empty > 0 : isMixed(c))),
+      c.name.toLowerCase().includes(term) && (filter === 'all' || (filter === 'check' ? needsLook(c) : !needsLook(c))),
   )
 
   return (
-    <>
-      <div className="bronze-tiles">
-        <Tile label="Rows" value={n(rows)} />
-        <Tile label="Columns" value={n(columns.length)} />
-        <Tile label="Values filled" value={`${percent(filled, cells)}%`} note={`${n(cells - filled)} empty`} />
-        <Tile label="Columns with empty values" value={n(withEmpty)} note={`of ${n(columns.length)}`} />
-        <Tile label="Columns with mixed lengths" value={n(mixed)} note="Check these first" />
-      </div>
-      <Card
-        flush
-        title={table}
-        description={
-          canViewRows
-            ? `Showing ${shown.length} of ${columns.length} columns. Click any count to see the rows behind it.`
-            : `Showing ${shown.length} of ${columns.length} columns`
-        }
-      >
-        <div className="bronze-tools">
-          <div className="pick-pills" role="group" aria-label="Filter columns">
-            {FILTERS.map((f) => (
-              <button
-                key={f.value}
-                type="button"
-                className={`pick-pill${f.value === filter ? ' is-on' : ''}`}
-                aria-pressed={f.value === filter}
-                onClick={() => setFilter(f.value)}
-              >
-                {f.label}
-              </button>
-            ))}
+    <div className="lx-panel">
+      <div className="lx-summary">
+        <Ring big value={table.filled ?? 100} />
+        <div className="lx-grow">
+          <h2>{table.name}</h2>
+          <span className="muted">Profiled {formatDateTime(table.read_at)}</span>
+        </div>
+        <dl className="lx-facts">
+          <div>
+            <dt>Rows</dt>
+            <dd>{n(rows)}</dd>
           </div>
+          <div>
+            <dt>Columns</dt>
+            <dd>{n(columns.length)}</dd>
+          </div>
+          <div>
+            <dt>Empty values</dt>
+            <dd className={empty ? 'is-warn' : undefined}>{n(empty)}</dd>
+          </div>
+          <div>
+            <dt>To check</dt>
+            <dd className={check.length ? 'is-warn' : undefined}>{n(check.length)}</dd>
+          </div>
+        </dl>
+      </div>
+      <div className="lx-filters">
+        <Seg
+          label="Filter columns"
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { value: 'all', label: `All ${columns.length}` },
+            { value: 'check', label: `To check · ${check.length}` },
+            { value: 'fine', label: `Looks fine · ${columns.length - check.length}` },
+          ]}
+        />
+        <label className="lx-search">
+          <Icon name="search" size={15} />
           <input
-            className="input"
             aria-label="Search columns"
             placeholder="Search columns"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+        </label>
+      </div>
+      {shown.length === 0 ? (
+        <EmptyState icon="search" title="No column matches" />
+      ) : (
+        <div className="lx-scroll">
+          <table className="lx-table">
+            <thead>
+              <tr>
+                <th>Column</th>
+                <th style={{ width: 150 }}>Filled</th>
+                <th className="num" style={{ width: 80 }}>
+                  Unique
+                </th>
+                <th>What is inside</th>
+                <th style={{ width: 130 }}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((c) => (
+                <ColumnRow
+                  key={c.name}
+                  code={code}
+                  table={table.name}
+                  column={c}
+                  rows={rows}
+                  canViewRows={canViewRows}
+                  open={open?.column === c.name ? open.label : null}
+                  onOpen={(label) => setOpen(label === null ? null : { column: c.name, label })}
+                />
+              ))}
+            </tbody>
+          </table>
         </div>
-        {shown.length === 0 ? (
-          <EmptyState icon="search" title="No column matches" />
-        ) : (
-          <div className="table-wrap scroll-box">
-            <table className="table counts-table">
-              <thead>
-                <tr>
-                  <th>Column</th>
-                  <th>Filled</th>
-                  <th className="num">Empty</th>
-                  <th className="num">Unique</th>
-                  <th>What is inside</th>
-                </tr>
-              </thead>
-              <tbody>
-                {shown.map((c) => (
-                  <CountsRow key={c.name} code={code} table={table} column={c} rows={rows} canViewRows={canViewRows} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
-    </>
+      )}
+    </div>
   )
 }
 
-function Bar({ share, title }: { share: number; title: string }) {
-  return (
-    <span className="bronze-bar" title={title}>
-      <i style={{ width: `${share}%` }} />
-    </span>
-  )
-}
-
-// One count, clickable when the person may see values: it opens the rows behind it.
-function CountButton({
-  label,
-  count,
-  open,
-  canViewRows,
-  onOpen,
-  children,
-}: {
-  label: string
-  count: number
-  open: boolean
-  canViewRows: boolean
-  onOpen: () => void
-  children: ReactNode
-}) {
-  if (!canViewRows || count === 0) return <>{children}</>
-  return (
-    <button
-      type="button"
-      className={`count-button${open ? ' is-on' : ''}`}
-      aria-expanded={open}
-      title={`See the ${n(count)} rows: ${label}`}
-      onClick={onOpen}
-    >
-      {children}
-    </button>
-  )
-}
-
-function CountsRow({
+function ColumnRow({
   code,
   table,
   column,
   rows,
   canViewRows,
+  open,
+  onOpen,
 }: {
   code: string
   table: string
   column: ColumnCounts
   rows: number
   canViewRows: boolean
+  open: string | null
+  onOpen: (label: string | null) => void
 }) {
-  const [open, setOpen] = useState<string | null>(null)
-  const inside = column.counts.length ? column.counts : (column.values ?? [])
-  const share = percent(column.filled, rows)
-  const toggle = (label: string) => setOpen(open === label ? null : label)
+  const parts = partsOf(column)
+  const st = status(column, rows)
+  // Clicking a row opens the rows behind its problem: the empty ones, or the first rarer length.
+  const problem = column.empty > 0 ? 'Empty' : (parts.find((p) => p.tone === 'warn' && p.count > 0)?.label ?? null)
+  const toggle = (label: string) => onOpen(open === label ? null : label)
+  const clickable = canViewRows && problem
   return (
     <>
-      <tr className={open ? 'is-open' : undefined}>
+      <tr
+        className={`${open ? 'is-open' : ''}${clickable ? ' is-clickable' : ''}`}
+        onClick={clickable ? () => toggle(problem) : undefined}
+      >
         <td>
           <strong>{column.name}</strong>
         </td>
         <td>
-          <span className="bronze-filled">
-            <Bar share={share} title={`${n(column.filled)} of ${n(rows)} rows filled`} />
-            <span className="text-sm">{share}%</span>
+          <span className="lx-filled">
+            <span className="lx-bar">
+              <i style={{ width: `${pct(column.filled, rows)}%` }} />
+            </span>
+            <span className="num muted">{pct(column.filled, rows)}%</span>
           </span>
-        </td>
-        <td className={`num${column.empty ? '' : ' muted'}`}>
-          <CountButton
-            label="Empty"
-            count={column.empty}
-            open={open === 'Empty'}
-            canViewRows={canViewRows}
-            onOpen={() => toggle('Empty')}
-          >
-            {n(column.empty)}
-          </CountButton>
         </td>
         <td className="num">{n(column.unique)}</td>
         <td>
-          {inside.length ? (
-            <ul className="bronze-inside">
-              {inside.map((c) => (
-                <li key={c.label}>
-                  <CountButton
-                    label={c.label}
-                    count={c.count}
-                    open={open === c.label}
-                    canViewRows={canViewRows}
-                    onOpen={() => toggle(c.label)}
-                  >
-                    <span className="bronze-inside-row">
-                      <span>{c.label}</span>
-                      <Bar
-                        share={percent(c.count, column.filled)}
-                        title={`${c.label}: ${n(c.count)} of ${n(column.filled)} filled values`}
-                      />
-                      <strong>{n(c.count)}</strong>
-                    </span>
-                  </CountButton>
-                </li>
-              ))}
-            </ul>
+          {parts.length ? (
+            <span className="lx-inside">
+              <Split parts={parts} />
+              <Legend parts={parts} open={open} onPick={canViewRows ? toggle : undefined} />
+            </span>
           ) : (
-            <span className="text-sm muted">Free text</span>
+            <span className="muted text-sm">Free text</span>
           )}
+        </td>
+        <td>
+          <Pill tone={st.tone}>{st.text}</Pill>
         </td>
       </tr>
       {open && (
-        <tr className="proof-row">
+        <tr className="lx-detail">
           <td colSpan={5}>
-            <Proof code={code} table={table} column={column.name} label={open} onClose={() => setOpen(null)} />
+            <Proof code={code} table={table} column={column.name} label={open} onClose={() => onOpen(null)} />
           </td>
         </tr>
       )}
@@ -499,17 +470,14 @@ function Proof({
     }
   }, [code, table, column, label, page])
   const pages = data ? Math.max(1, Math.ceil(data.count / data.page_size)) : 1
-  const shown = (v: unknown) => (v === null || v === undefined || v === '' ? <span className="muted">Empty</span> : String(v))
-
+  const shown = (v: unknown) =>
+    v === null || v === undefined || v === '' ? <span className="muted">Empty</span> : String(v)
   return (
-    <div className="proof">
-      <div className="proof-head">
-        <div className="stack" style={{ gap: 2 }}>
-          <strong>
-            {data ? n(data.count) : '...'} rows: {column} is {label === 'Empty' ? 'empty' : <q>{label}</q>}
-          </strong>
-          <span className="text-xs muted">Real rows from the table, so you can check the count yourself.</span>
-        </div>
+    <div className="lx-proof">
+      <div className="lx-proof-h">
+        <strong>
+          {data ? n(data.count) : '…'} rows · {column}: {label === 'Empty' ? 'empty' : label}
+        </strong>
         <button type="button" className="btn btn-sm" onClick={onClose}>
           Close
         </button>
@@ -518,35 +486,33 @@ function Proof({
       {!data && !error && <Loader kind="scan" label="Finding the rows" />}
       {data && (
         <>
-          <div className="table-wrap">
-            <table className="table proof-table">
-              <thead>
-                <tr>
-                  <th className="num">Row</th>
-                  <th>{data.key}</th>
-                  <th>{column}</th>
+          <table className="lx-mini">
+            <thead>
+              <tr>
+                <th className="num">Row</th>
+                <th>{data.key}</th>
+                <th>{column}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.results.map((r) => (
+                <tr key={r.row}>
+                  <td className="num muted">{r.row}</td>
+                  <td className="muted lx-key">{shown(r.key)}</td>
+                  <td>
+                    <code>{shown(r.value)}</code>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {data.results.map((r) => (
-                  <tr key={r.row}>
-                    <td className="num muted">{r.row}</td>
-                    <td className="proof-key">{shown(r.key)}</td>
-                    <td>
-                      <code>{shown(r.value)}</code>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
           {pages > 1 && (
-            <div className="proof-pages">
+            <div className="lx-pages">
               <button type="button" className="btn btn-sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
                 Previous
               </button>
               <span className="text-sm muted">
-                Page {page} of {pages}
+                {page} of {pages}
               </span>
               <button type="button" className="btn btn-sm" disabled={page >= pages} onClick={() => setPage(page + 1)}>
                 Next

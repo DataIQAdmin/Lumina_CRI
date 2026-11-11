@@ -302,6 +302,7 @@ def test_every_count_can_show_the_rows_behind_it(admin, code):
 
 def test_tables_say_how_many_columns_need_a_look(admin, code):
     table = admin.get(f"/api/raw/{code}/").json()["tables"][0]
+    assert table["to_check"] == 3 and table["filled"] == 87  # 13 of 15 values filled
     assert table["mixed"] == 1  # Phone: 10, 9 and 7 digits
     assert table["with_empty"] == 2  # EmailAddress and PAN
 

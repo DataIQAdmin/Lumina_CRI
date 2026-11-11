@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 
 import { api } from '../api/client'
-import type { Capability, Source } from '../api/types'
+import type { Capability } from '../api/types'
 import { applyTheme, getTheme, type Theme } from '../theme'
 import { useAuth } from '../auth/AuthContext'
 import { useOrganization } from '../organization'
 import { BrandMark } from './BrandMark'
+import { FlowPill } from './FlowPill'
 import { Icon, type IconName } from './Icon'
 import { OrgLogo } from './OrgLogo'
 import { ProfileJobPanel } from './ProfileJobPanel'
@@ -74,7 +75,6 @@ export function Layout() {
   const location = useLocation()
   const [pending, setPending] = useState<number | null>(null)
   const [pendingCorrections, setPendingCorrections] = useState<number | null>(null)
-  const [sources, setSources] = useState<Source[] | null>(null)
   const [theme, setTheme] = useState<Theme>(getTheme)
   // Phones and small tablets: the menu is a drawer that slides in from the left.
   const [navOpen, setNavOpen] = useState(false)
@@ -109,14 +109,9 @@ export function Layout() {
         .then((page) => setPending(page.count))
         .catch(() => setPending(null))
     }
-    api
-      .sources()
-      .then((page) => setSources(page.results))
-      .catch(() => setSources(null))
   }, [location.pathname, canSeeMatches, canApprove])
 
   const page = PAGE_TITLES.find((p) => location.pathname.startsWith(p.path))
-  const off = sources?.filter((s) => !s.enabled).length ?? 0
 
   return (
     <div className="shell">
@@ -197,17 +192,7 @@ export function Layout() {
             <strong>{page?.title ?? 'Workspace'}</strong>
           </div>
           <div className="topbar-right">
-            {sources && (
-              <span className="pill" title="Status of the bank systems Lumina reads from">
-                <span className={`badge-dot ${off ? 'warn' : 'live'}`} />
-                <span className="pill-long">
-                  {off
-                    ? `${off} source${off > 1 ? 's' : ''} disconnected`
-                    : `All ${sources.length} sources connected`}
-                </span>
-                <span className="pill-short">{off ? `${off} off` : `${sources.length} live`}</span>
-              </span>
-            )}
+            <FlowPill />
             {/* The organization's own logo: the one place its identity appears inside Lumina. */}
             <span className="org-badge" title={`Signed in to ${org.name}`}>
               <OrgLogo org={org} size={26} />
