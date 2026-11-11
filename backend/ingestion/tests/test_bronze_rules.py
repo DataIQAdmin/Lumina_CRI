@@ -261,3 +261,18 @@ def test_ai_helper_off_without_a_key(admin, code, settings):
     settings.LLM_API_KEY = ""
     response = admin.post(f"/api/rules/{code}/suggest/", {"table": TABLE, "column": "PAN"}, format="json")
     assert response.status_code == 400 and "not set up" in response.json()["detail"]
+
+
+def test_ai_helper_says_why_the_model_api_failed(admin, code, settings, monkeypatch):
+    import io
+    import urllib.error
+
+    settings.LLM_API_KEY = "wrong-key "
+
+    def refuse(request, timeout):
+        assert request.get_header("Authorization") == "Bearer wrong-key"  # spaces around a pasted key are dropped
+        raise urllib.error.HTTPError(request.full_url, 401, "Unauthorized", {}, io.BytesIO(b'{"error": "bad key"}'))
+
+    monkeypatch.setattr("urllib.request.urlopen", refuse)
+    response = admin.post(f"/api/rules/{code}/suggest/", {"table": TABLE, "column": "PAN"}, format="json")
+    assert response.status_code == 400 and "HTTP 401" in response.json()["detail"]
