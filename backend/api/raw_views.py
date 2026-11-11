@@ -30,9 +30,18 @@ def _source(code):
     return source, None
 
 
+def _needs_look(c):
+    counts = c.get("counts", [])
+    if counts and counts[0]["label"].startswith("Up to "):
+        return bool(c.get("empty")) or counts[1]["count"] > 0
+    return bool(c.get("empty")) or sum(1 for x in counts if x["count"]) > 1
+
+
 def _table_json(t):
     columns = (t.profile or {}).get("columns", [])
-    return {"name": t.name, "columns": len(t.columns), "rows": t.rows, "complete": t.complete,
+    cells = t.rows * len(columns)
+    return {"filled": round(100 * sum(c.get("filled", 0) for c in columns) / cells) if cells else 100,
+            "to_check": sum(1 for c in columns if _needs_look(c)),"name": t.name, "columns": len(t.columns), "rows": t.rows, "complete": t.complete,
             "sensitive": t.sensitive, "read_at": t.read_at.isoformat(),
             # how many columns need a look: mixed lengths, or empty values
             "mixed": sum(1 for c in columns if sum(1 for x in c.get("counts", []) if x["count"]) > 1),
