@@ -10,6 +10,7 @@ own: the screen shows it with how many rows pass, and the person previews and ap
 """
 
 import json
+import logging
 import re
 import urllib.error
 import urllib.request
@@ -19,6 +20,8 @@ from django.conf import settings
 
 from .raw import is_identity
 from .rules import RuleError, compile_rule, preview, rows_of, text_of
+
+log = logging.getLogger(__name__)
 
 MOST_SHAPES = 8
 TIMEOUT = 25  # seconds for one answer from the model
@@ -64,17 +67,27 @@ def _ask(messages):
                        "response_format": {"type": "json_object"}}).encode()
     request = urllib.request.Request(
         settings.LLM_BASE_URL.rstrip("/") + "/chat/completions", data=body, method="POST",
-        headers={"Authorization": f"Bearer {settings.LLM_API_KEY}", "Content-Type": "application/json",
+        headers={"Authorization": f"Bearer {settings.LLM_API_KEY.strip()}", "Content-Type": "application/json",
                  "User-Agent": "Lumina-CRI"})
     try:
         with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
             return json.loads(response.read())["choices"][0]["message"]["content"]
     except urllib.error.HTTPError as exc:
+        detail = exc.read()[:300].decode("utf-8", "replace")
+        log.warning("AI helper: HTTP %s from the model API: %s", exc.code, detail)
         if exc.code == 429:
             raise AiError("The AI helper is busy. Please try again in a minute.") from exc
-        raise AiError("The AI helper did not answer. Please try again, or pick from the library.") from exc
+        if exc.code == 401:
+            raise AiError("The AI key is not accepted (HTTP 401). Check LLM_API_KEY on the server.") from exc
+        if exc.code in (400, 404) and "model" in detail.lower():
+            raise AiError(f"The AI model {settings.LLM_MODEL!r} is not available (HTTP {exc.code}). "
+                          "Set LLM_MODEL on the server to a model the provider lists.") from exc
+        raise AiError(f"The AI helper did not answer (HTTP {exc.code}). Please try again, or pick from the "
+                      "library.") from exc
     except (urllib.error.URLError, TimeoutError, KeyError, ValueError) as exc:
-        raise AiError("The AI helper did not answer. Please try again, or pick from the library.") from exc
+        log.warning("AI helper: no answer from the model API: %r", exc)
+        raise AiError("The AI helper did not answer (no connection). Please try again, or pick from the "
+                      "library.") from exc
 
 
 def _read(answer):
