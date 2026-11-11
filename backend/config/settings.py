@@ -182,7 +182,7 @@ CONNECTOR_MAX_ROWS = int(os.getenv('CONNECTOR_MAX_ROWS', '50000'))
 # key the helper is off. The key is a secret: set it on the server, never in the repo.
 LLM_API_KEY = os.getenv('LLM_API_KEY', '')
 LLM_BASE_URL = os.getenv('LLM_BASE_URL', 'https://api.groq.com/openai/v1')
-LLM_MODEL = os.getenv('LLM_MODEL', 'llama-3.1-8b-instant')
+LLM_MODEL = os.getenv('LLM_MODEL', 'openai/gpt-oss-20b')
 CONNECTOR_TIMEOUT_SECONDS = int(os.getenv('CONNECTOR_TIMEOUT_SECONDS', '30'))
 
 # Synthetic demo data, one folder per organization: fake_sources/<schema>/ holds that bank's core banking
