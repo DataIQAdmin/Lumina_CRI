@@ -5443,3 +5443,319 @@ td.num .count-button {
 .offer-label.is-bad {
   color: var(--bad-text);
 }
+
+/* Profiling job: popup with a checklist, or a small panel in the corner */
+.job-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(15 15 25 / 0.45);
+}
+
+.job-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(520px, 100%);
+  max-height: calc(100vh - 32px);
+  padding: 22px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.25);
+}
+
+.job-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.job-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.job-list li {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 2px;
+  border-top: 1px solid var(--border);
+}
+
+.job-list .job-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.job-list li.is-waiting .job-name,
+.job-list li.is-stopped .job-name {
+  color: var(--text-3);
+}
+
+.job-list li.is-done .job-mark {
+  color: var(--good-text);
+}
+
+.job-list li.is-failed .job-mark {
+  color: var(--bad-text);
+}
+
+.job-list li.is-failed .text-xs {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--bad-text);
+}
+
+.job-mark {
+  display: inline-flex;
+  justify-content: center;
+}
+
+.job-spin {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--accent-soft);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: job-spin 0.8s linear infinite;
+}
+
+@keyframes job-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .job-spin {
+    animation: none;
+  }
+}
+
+.job-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.job-corner {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(340px, calc(100vw - 32px));
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.18);
+}
+
+.job-corner-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.job-corner-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Profiled tables: a list on the left, the counts on the right */
+.profiled-layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.profiled-list {
+  max-height: 640px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.profiled-list button {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 20px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.profiled-list button:hover {
+  background: var(--surface-2);
+}
+
+.profiled-list button.is-on {
+  box-shadow: inset 3px 0 0 var(--accent);
+  background: var(--accent-soft);
+}
+
+.profiled-list button.is-on .pick-name {
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.profiled-list .pick-name {
+  overflow-wrap: anywhere;
+}
+
+.profiled-main {
+  min-width: 0;
+}
+
+/* Rules: search and status on the column list */
+.rule-search {
+  padding: 0 20px 12px;
+}
+
+.rule-search .input {
+  width: 100%;
+}
+
+.rule-status {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 3px;
+  color: var(--good-text);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Silver: why rows were rejected */
+.reasons {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reason-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 220px) minmax(60px, 1fr) 80px;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.reason-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reason-row .num {
+  font-size: 13px;
+  text-align: right;
+}
+
+/* The data flow bar on top of the data pages */
+.pipeline ol {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.pipeline a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: inherit;
+  text-decoration: none;
+}
+
+.pipeline a:hover {
+  border-color: var(--border-strong);
+}
+
+.pipeline li.is-here a {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.pipeline-n {
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--surface-sunken);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pipeline li.is-here .pipeline-n {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.pipeline-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pipeline-text strong {
+  font-size: 13px;
+}
+
+@media (max-width: 760px) {
+  .profiled-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .profiled-list {
+    max-height: 220px;
+  }
+
+  .pipeline ol {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reason-row {
+    grid-template-columns: minmax(0, 1fr) 60px;
+  }
+
+  .reason-row .bronze-bar {
+    display: none;
+  }
+}

@@ -31,6 +31,7 @@ urlpatterns = [
     path("regex/test/", rule_views.test),
     path("silver/<slug:code>/", rule_views.silver_tables),
     path("silver/<slug:code>/rows/", rule_views.silver_rows),
+    path("pipeline/", rule_views.pipeline),
     path("customers/<int:pk>/interactions/", interaction_views.customer_interactions),
     path("customers/<int:pk>/briefing/", interaction_views.customer_briefing),
     path("interactions/open/", interaction_views.open_items),

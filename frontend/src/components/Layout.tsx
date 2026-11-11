@@ -9,6 +9,7 @@ import { useOrganization } from '../organization'
 import { BrandMark } from './BrandMark'
 import { Icon, type IconName } from './Icon'
 import { OrgLogo } from './OrgLogo'
+import { ProfileJobPanel } from './ProfileJobPanel'
 import { Avatar } from './ui'
 
 type NavItem = { to: string; label: string; icon: IconName; end?: boolean; needs?: Capability[] }
@@ -220,6 +221,7 @@ export function Layout() {
           </div>
         </div>
       </main>
+      <ProfileJobPanel />
     </div>
   )
 }

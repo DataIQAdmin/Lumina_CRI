@@ -7,6 +7,7 @@ import { useApi } from '../api/useApi'
 import { useCan } from '../auth/AuthContext'
 import { Icon } from '../components/Icon'
 import { Loader } from '../components/Loader'
+import { PipelineBar } from '../components/PipelineBar'
 import { useToast } from '../components/Toasts'
 import { Card, ErrorAlert, PageHeader, StatusBadge } from '../components/ui'
 import { ConnectorLogo } from '../components/ConnectorLogo'
@@ -73,6 +74,7 @@ export function ConnectorsPage() {
           )
         }
       />
+      <PipelineBar />
       {error && <ErrorAlert message={error} />}
 
       {data && (

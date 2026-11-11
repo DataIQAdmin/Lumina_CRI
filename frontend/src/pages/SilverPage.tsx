@@ -5,6 +5,7 @@ import { api } from '../api/client'
 import type { SilverTable } from '../api/types'
 import { useApi } from '../api/useApi'
 import { ConnectorPicker } from '../components/ConnectorPicker'
+import { PipelineBar } from '../components/PipelineBar'
 import { Icon } from '../components/Icon'
 import { Loader } from '../components/Loader'
 import { Card, EmptyState, ErrorAlert, PageHeader } from '../components/ui'
@@ -23,6 +24,7 @@ export function SilverPage() {
   return (
     <>
       <PageHeader title="Silver layer" description="Only the rows that pass your rules. All other rows stay in rejected." />
+      <PipelineBar />
       {sources.error && <ErrorAlert message={sources.error} />}
       {!sources.data && !sources.error && (
         <div className="card">
@@ -115,13 +117,20 @@ function SilverTables({ code, onOpen }: { code: string; onOpen: (table: string) 
 function SilverTableDetail({ code, table, onBack }: { code: string; table: string; onBack: () => void }) {
   const [show, setShow] = useState<'passed' | 'rejected'>('passed')
   const [page, setPage] = useState(1)
-  const rows = useApi(() => api.silverRows(code, table, show, page), [code, table, show, page])
+  const [only, setOnly] = useState('') // show only rows that failed this column
+  const rows = useApi(() => api.silverRows(code, table, show, page, only), [code, table, show, page, only])
   const d = rows.data
   const pages = Math.max(1, Math.ceil((d?.count ?? 0) / 50))
   const hasRules = d ? Object.keys(d.rules).length > 0 : true
   const choose = (next: 'passed' | 'rejected') => {
     setShow(next)
     setPage(1)
+    setOnly('')
+  }
+  const failing = (column: string) => {
+    setShow('rejected')
+    setPage(1)
+    setOnly(only === column ? '' : column)
   }
 
   return (
@@ -158,6 +167,33 @@ function SilverTableDetail({ code, table, onBack }: { code: string; table: strin
         ))}
       </div>
 
+      {d && d.reasons.length > 0 && (
+        <Card title="Why rows were rejected" description="Rows that failed each rule. A row can fail more than one. Click one to see its rows.">
+          <ul className="reasons">
+            {d.reasons.map((r) => (
+              <li key={r.column}>
+                <button
+                  type="button"
+                  className={`count-button${only === r.column ? ' is-on' : ''}`}
+                  aria-pressed={only === r.column}
+                  onClick={() => failing(r.column)}
+                >
+                  <span className="reason-row">
+                    <strong>{r.column}</strong>
+                    <span className="bronze-bar">
+                      <i style={{ width: `${Math.round((100 * r.rows) / Math.max(d.rejected, 1))}%` }} />
+                    </span>
+                    <span className="num">
+                      {n(r.rows)} row{r.rows === 1 ? '' : 's'}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
       {rows.error && <ErrorAlert message={rows.error} />}
       {!hasRules ? (
         <Card>
@@ -170,7 +206,13 @@ function SilverTableDetail({ code, table, onBack }: { code: string; table: strin
         <Card
           flush
           title={show === 'passed' ? 'Silver rows' : 'Rejected rows'}
-          description={show === 'rejected' ? 'Red cells failed their rule.' : 'These rows passed every rule.'}
+          description={
+            show === 'rejected'
+              ? only
+                ? `Only rows that failed ${only}. Red cells failed their rule.`
+                : 'Red cells failed their rule.'
+              : 'These rows passed every rule.'
+          }
           actions={
             pages > 1 && (
               <div className="row" style={{ gap: 6 }}>

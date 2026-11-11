@@ -32,6 +32,7 @@ import type {
   ProfilingSummary,
   ProfiledRecords,
   CountProof,
+  Pipeline,
   RawSources,
   RawTable,
   RawTableProfile,
@@ -251,8 +252,11 @@ export const api = {
   regexTest: (code: string, table: string, pattern: string) =>
     post<{ columns: { column: string; matched: number; filled: number }[] }>('/regex/test/', { code, table, pattern }),
   silverTables: (code: string) => get<{ code: string; name: string; tables: SilverTable[] }>(`/silver/${code}/`),
-  silverRows: (code: string, table: string, show: 'passed' | 'rejected', page: number) =>
-    get<SilverRows>(`/silver/${code}/rows/?table=${encodeURIComponent(table)}&show=${show}&page=${page}`),
+  silverRows: (code: string, table: string, show: 'passed' | 'rejected', page: number, failed = '') =>
+    get<SilverRows>(
+      `/silver/${code}/rows/?${new URLSearchParams({ table, show, page: String(page), ...(failed ? { failed } : {}) })}`,
+    ),
+  pipeline: () => get<Pipeline>('/pipeline/'),
   connectorFiles: (code: string) => get<UploadedFile[]>(`/connectors/${code}/files/`),
   setFileStatus: (code: string, ids: number[], status: UploadedFile['status']) =>
     post<{ changed: number; files: UploadedFile[] }>(`/connectors/${code}/files/status/`, { ids, status }),

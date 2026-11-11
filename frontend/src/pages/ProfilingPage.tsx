@@ -1,15 +1,16 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type { ColumnCounts, CountProof } from '../api/types'
 import { useApi } from '../api/useApi'
 import { ConnectorPicker } from '../components/ConnectorPicker'
+import { PipelineBar } from '../components/PipelineBar'
 import { Icon } from '../components/Icon'
 import { Loader } from '../components/Loader'
-import { useToast } from '../components/Toasts'
 import { Card, EmptyState, ErrorAlert, PageHeader } from '../components/ui'
 import { formatDateTime } from '../format'
+import { profileJob } from '../profileJob'
 
 const n = (v: number) => v.toLocaleString('en-IN')
 
@@ -27,6 +28,7 @@ export function ProfilingPage() {
         title="Data profiling"
         description="Choose a connector, choose its tables, and see the counts for each column."
       />
+      <PipelineBar />
       {sources.error && <ErrorAlert message={sources.error} />}
       {!sources.data && !sources.error && (
         <div className="card">
@@ -46,6 +48,7 @@ export function ProfilingPage() {
           <ConnectorTables
             key={chosen.code}
             code={chosen.code}
+            source={chosen.name}
             canRead={sources.data?.can_read ?? false}
             canViewRows={sources.data?.can_view_rows ?? false}
             onProfiled={sources.reload}
@@ -58,23 +61,24 @@ export function ProfilingPage() {
 
 function ConnectorTables({
   code,
+  source,
   canRead,
   canViewRows,
   onProfiled,
 }: {
   code: string
+  source: string
   canRead: boolean
   canViewRows: boolean
   onProfiled: () => void
 }) {
-  const toast = useToast()
   const profiled = useApi(() => api.rawTables(code), [code])
   const [params, setParams] = useSearchParams()
   const [names, setNames] = useState<string[] | null>(null)
   const [listError, setListError] = useState<string | null>(null)
   const [ticked, setTicked] = useState<Set<string>>(new Set())
-  const [progress, setProgress] = useState<{ done: number; total: number; table: string } | null>(null)
-  const [failed, setFailed] = useState<{ table: string; error: string }[]>([])
+  const job = useSyncExternalStore(profileJob.subscribe, profileJob.get)
+  const busy = !!job && job.finished === null
   const results = useRef<HTMLDivElement>(null)
   const [changing, setChanging] = useState(false) // the table list folds away once something is profiled
 
@@ -99,37 +103,22 @@ function ConnectorTables({
       return next
     })
 
-  // One table at a time, so each request stays short.
-  const profile = async () => {
-    const chosen = all.filter((name) => ticked.has(name))
-    const problems: { table: string; error: string }[] = []
-    setFailed([])
-    for (const [i, name] of chosen.entries()) {
-      setProgress({ done: i, total: chosen.length, table: name })
-      try {
-        await api.rawRead(code, name)
-      } catch {
-        // One more try: the hosted server may have restarted halfway; reading a table again is safe.
-        try {
-          await api.rawRead(code, name)
-        } catch (e) {
-          problems.push({ table: name, error: (e as Error).message })
-        }
-      }
-    }
-    setProgress(null)
-    setFailed(problems)
+  // The job reads one table at a time and shows its own progress (ProfileJobPanel). When a job on this connector
+  // ends, show its results here.
+  const profile = () => {
+    profileJob.start(code, source, all.filter((name) => ticked.has(name)))
     setTicked(new Set())
+  }
+  const ended = job && job.code === code ? job.finished : null
+  useEffect(() => {
+    if (!ended) return
     setChanging(false)
-    const read = chosen.length - problems.length
-    toast(problems.length ? 'error' : 'success', `Profiled ${read} of ${chosen.length} tables.`)
     profiled.reload()
     onProfiled()
-    if (chosen[0]) setParams({ source: code, table: chosen[0] })
-    setTimeout(() => results.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300)
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ended])
 
-  const folded = done.length > 0 && !changing && !progress && failed.length === 0
+  const folded = done.length > 0 && !changing
 
   return (
     <>
@@ -155,7 +144,7 @@ function ConnectorTables({
                 <button
                   type="button"
                   className="btn btn-sm"
-                  disabled={progress !== null}
+                  disabled={busy}
                   onClick={() => {
                     setChanging(false)
                     setTicked(new Set())
@@ -167,7 +156,7 @@ function ConnectorTables({
               <button
                 type="button"
                 className="btn btn-sm"
-                disabled={!all.length || progress !== null}
+                disabled={!all.length || busy}
                 onClick={() => setTicked(ticked.size === all.length ? new Set() : new Set(all))}
               >
                 {ticked.size === all.length && all.length ? 'Clear all' : 'Select all'}
@@ -175,7 +164,7 @@ function ConnectorTables({
               <button
                 type="button"
                 className="btn btn-primary btn-sm"
-                disabled={!ticked.size || progress !== null}
+                disabled={!ticked.size || busy}
                 onClick={profile}
               >
                 <Icon name="search" size={14} /> Profile selected{ticked.size ? ` (${ticked.size})` : ''}
@@ -184,20 +173,7 @@ function ConnectorTables({
           ))
         }
       >
-        {progress && (
-          <div className="raw-progress" role="status" aria-live="polite">
-            <span>
-              Profiling {progress.done + 1} of {progress.total}: <strong>{progress.table}</strong>
-            </span>
-            <span className="raw-progress-bar" aria-hidden="true">
-              <i style={{ width: `${(100 * progress.done) / progress.total}%` }} />
-            </span>
-          </div>
-        )}
         {listError && <ErrorAlert message={listError} />}
-        {failed.map((f) => (
-          <ErrorAlert key={f.table} message={`${f.table}: ${f.error}`} />
-        ))}
         {canRead && names === null && !listError && <Loader kind="scan" label="Asking the connector for its tables" />}
         {names !== null && all.length === 0 && (
           <EmptyState icon="search" title="No tables found">
@@ -213,7 +189,7 @@ function ConnectorTables({
                     <input
                       type="checkbox"
                       checked={ticked.has(name)}
-                      disabled={progress !== null}
+                      disabled={busy}
                       onChange={() => toggle(name)}
                     />
                   )}
@@ -232,23 +208,31 @@ function ConnectorTables({
 
       {profiled.error && <ErrorAlert message={profiled.error} />}
       {open && (
-        <div ref={results} className="pick-results">
-          {done.length > 1 && (
-            <div className="pick-pills" role="group" aria-label="Profiled table">
+        <div ref={results} className="pick-results profiled-layout">
+          <Card flush title="Profiled tables" description={`${done.length} of ${all.length}`}>
+            <ul className="profiled-list">
               {done.map((t) => (
-                <button
-                  key={t.name}
-                  type="button"
-                  className={`pick-pill${t.name === open.name ? ' is-on' : ''}`}
-                  aria-pressed={t.name === open.name}
-                  onClick={() => setParams({ source: code, table: t.name })}
-                >
-                  {t.name}
-                </button>
+                <li key={t.name}>
+                  <button
+                    type="button"
+                    className={t.name === open.name ? 'is-on' : ''}
+                    aria-pressed={t.name === open.name}
+                    onClick={() => setParams({ source: code, table: t.name })}
+                  >
+                    <span className="pick-name">{t.name}</span>
+                    <span className="text-xs muted">
+                      {n(t.rows)} rows
+                      {t.mixed ? ` · ${t.mixed} mixed` : ''}
+                      {t.with_empty ? ` · ${t.with_empty} with empty` : ''}
+                    </span>
+                  </button>
+                </li>
               ))}
-            </div>
-          )}
-          <Counts key={`${open.name}:${open.read_at}`} code={code} table={open.name} canViewRows={canViewRows} />
+            </ul>
+          </Card>
+          <div className="profiled-main">
+            <Counts key={`${open.name}:${open.read_at}`} code={code} table={open.name} canViewRows={canViewRows} />
+          </div>
         </div>
       )}
     </>

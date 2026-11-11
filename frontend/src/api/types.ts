@@ -562,6 +562,15 @@ export interface RawTable {
   complete: boolean
   sensitive: string[]
   read_at: string
+  mixed: number // columns with mixed lengths
+  with_empty: number // columns with empty values
+}
+
+export interface Pipeline {
+  connectors: number
+  tables: number
+  rules: number
+  silver: number
 }
 
 export interface ColumnCounts {
@@ -586,7 +595,7 @@ export interface RegexCheck {
 export interface RuleColumns {
   name: string
   rows: number
-  columns: { name: string; pattern: string }[]
+  columns: { name: string; pattern: string; passed?: number; total?: number }[]
 }
 
 // What the AI helper suggests for a column, already checked and tested there (backend ingestion/regex_ai.py).
@@ -656,5 +665,6 @@ export interface SilverRows {
   count: number
   passed: number
   rejected: number
+  reasons: { column: string; rows: number }[]
   results: { position: number; values: unknown[]; failed: string[] }[]
 }
