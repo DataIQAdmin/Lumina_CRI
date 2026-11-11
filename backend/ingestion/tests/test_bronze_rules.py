@@ -219,3 +219,45 @@ def test_library_keeps_saved_regexes(admin, db):
     assert admin.post("/api/regex/library/", {"name": " ", "pattern": r"\d"}, format="json").status_code == 400
     assert admin.delete(f"/api/regex/library/{made.json()['id']}/").status_code == 204
     assert admin.get("/api/regex/library/").json()["saved"] == []
+
+
+def test_fake_ids_use_real_indian_formats():
+    header = ["CustomerID", "PassportNumber", "VoterID", "DrivingLicense"]
+    _, rows = fake_table(header, [[f"C{i}", "", "", ""] for i in range(400)])
+    for i, ready in [(1, "Passport number"), (2, "Voter ID"), (3, "Driving licence")]:
+        pattern = compile_rule(next(r["pattern"] for r in READY_REGEXES if r["name"] == ready))
+        filled = [r[i] for r in rows if r[i]]
+        good = sum(pattern.fullmatch(v) is not None for v in filled)
+        assert len(filled) * 0.85 < good < len(filled), ready  # mostly right, a few wrong on purpose
+
+
+def test_ai_helper_sends_shapes_not_values_and_returns_a_tested_regex(admin, code, settings, monkeypatch):
+    settings.LLM_API_KEY = "test-key"
+    sent = []
+
+    def ask(messages):
+        sent.append(messages)
+        return '{"pattern": "^[A-Z]{5}[0-9]{4}[A-Z]$", "explanation": "Five capitals, four digits, one capital."}'
+
+    monkeypatch.setattr("ingestion.regex_ai._ask", ask)
+    body = admin.post(f"/api/rules/{code}/suggest/", {"table": TABLE, "column": "PAN"}, format="json").json()
+    assert body == {"pattern": "^[A-Z]{5}[0-9]{4}[A-Z]$", "explanation": "Five capitals, four digits, one capital.",
+                    "passed": 1, "failed": 2, "total": 3}
+    told = str(sent)
+    assert "AAAAA9999A" in told and "ABCDE1234F" not in told and "abcde1234f" not in told
+    assert not ColumnRule.objects.exists()  # a suggestion is never applied on its own
+
+
+def test_ai_helper_retries_once_after_a_bad_regex(admin, code, settings, monkeypatch):
+    settings.LLM_API_KEY = "test-key"
+    answers = iter(['{"pattern": "([0-9", "explanation": "x"}', '{"pattern": "^[0-9]+$", "explanation": "Digits."}'])
+    monkeypatch.setattr("ingestion.regex_ai._ask", lambda messages: next(answers))
+    body = admin.post(f"/api/rules/{code}/suggest/", {"table": TABLE, "column": "Phone", "wish": "digits only"},
+                      format="json").json()
+    assert body["pattern"] == "^[0-9]+$" and body["passed"] == 3
+
+
+def test_ai_helper_off_without_a_key(admin, code, settings):
+    settings.LLM_API_KEY = ""
+    response = admin.post(f"/api/rules/{code}/suggest/", {"table": TABLE, "column": "PAN"}, format="json")
+    assert response.status_code == 400 and "not set up" in response.json()["detail"]

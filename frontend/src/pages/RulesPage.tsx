@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 
 import { api } from '../api/client'
-import type { ReadyRegex, RegexCheck, RegexLibrary, RulePreview } from '../api/types'
+import type { ReadyRegex, RegexCheck, RegexLibrary, RegexSuggestion, RulePreview } from '../api/types'
 import { useApi } from '../api/useApi'
 import { ConnectorPicker } from '../components/ConnectorPicker'
 import { Icon } from '../components/Icon'
@@ -48,7 +48,7 @@ export function RulesPage() {
     <>
       <PageHeader
         title="Rules"
-        description="Pick or write a regular expression for a column, preview it, then apply it. Rows that pass go to silver."
+        description="Ask AI, pick or write a regular expression for a column, preview it, then apply it. Rows that pass go to silver."
       />
       {sources.error && <ErrorAlert message={sources.error} />}
       {!sources.data && !sources.error && (
@@ -131,6 +131,77 @@ function LibraryPicker({
         </optgroup>
       </select>
     </label>
+  )
+}
+
+// Ask the AI helper for a regex. The answer comes back checked and tested on this column; "Use this" only puts it
+// in the box, so the usual Preview and Apply still decide.
+function AiHelper({
+  code,
+  table,
+  column,
+  onUse,
+}: {
+  code: string
+  table: string
+  column: string
+  onUse: (pattern: string) => void
+}) {
+  const [wish, setWish] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [found, setFound] = useState<RegexSuggestion | null>(null)
+  const ask = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      setFound(await api.ruleSuggest(code, table, column, wish))
+    } catch (e) {
+      setFound(null)
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="ai-helper">
+      <div className="ai-helper-ask">
+        <input
+          className="input"
+          aria-label="Describe the rule in words (optional)"
+          placeholder="Optional: describe the rule, e.g. 10-digit mobile starting with 6 to 9"
+          value={wish}
+          onChange={(e) => setWish(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !busy) ask()
+          }}
+        />
+        <button type="button" className="btn btn-primary" disabled={busy} onClick={ask}>
+          <Icon name="search" size={14} /> {busy ? 'Thinking...' : 'Suggest with AI'}
+        </button>
+      </div>
+      {error && <ErrorAlert message={error} />}
+      {found && (
+        <div className="ai-helper-answer" role="status">
+          <code>{found.pattern}</code>
+          {found.explanation && <p className="text-sm">{found.explanation}</p>}
+          <p className="text-sm muted">
+            {n(found.passed)} of {n(found.total)} rows pass this regex.
+          </p>
+          <div className="row" style={{ gap: 8 }}>
+            <button type="button" className="btn btn-sm btn-primary" onClick={() => onUse(found.pattern)}>
+              Use this
+            </button>
+            <button type="button" className="btn btn-sm" disabled={busy} onClick={ask}>
+              Try again
+            </button>
+          </div>
+        </div>
+      )}
+      <p className="text-xs muted">
+        Only the column name and the shape of its values (like AAAAA9999A) go to the AI, never the values.
+      </p>
+    </div>
   )
 }
 
@@ -270,7 +341,11 @@ function RuleEditor({
   return (
     <Card title={column} description="The whole value must match. Empty values fail unless your regex allows them.">
       <div className="stack" style={{ gap: 12 }}>
-        <LibraryPicker library={library} column={column} onPick={setPattern} />
+        <AiHelper code={code} table={table} column={column} onUse={setPattern} />
+        <details className="regex-browse">
+          <summary className="text-sm">Or browse the regex library</summary>
+          <LibraryPicker library={library} column={column} onPick={setPattern} />
+        </details>
         <input
           className="input regex-input"
           aria-label={`Regular expression for ${column}`}

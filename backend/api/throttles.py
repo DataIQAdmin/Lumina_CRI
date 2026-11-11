@@ -1,12 +1,18 @@
-"""Tighter rate limits for the endpoints people could hammer: sign-in and the push API."""
+"""Tighter rate limits for the endpoints people could hammer: sign-in, the push API and the AI helper."""
 
-from rest_framework.throttling import AnonRateThrottle, SimpleRateThrottle
+from rest_framework.throttling import AnonRateThrottle, SimpleRateThrottle, UserRateThrottle
 
 
 class LoginThrottle(AnonRateThrottle):
     """10 sign-in attempts a minute from one IP address, on top of the per-account lockout."""
 
     scope = "login"
+
+
+class AiThrottle(UserRateThrottle):
+    """20 AI regex suggestions a minute per person: the free model has its own limits."""
+
+    scope = "ai"
 
 
 class IngestThrottle(SimpleRateThrottle):

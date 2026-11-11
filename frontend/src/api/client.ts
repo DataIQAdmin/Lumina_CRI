@@ -37,6 +37,7 @@ import type {
   RegexCheck,
   RegexLibrary,
   RuleColumns,
+  RegexSuggestion,
   RulePreview,
   SavedRegex,
   SilverRows,
@@ -230,6 +231,8 @@ export const api = {
     get<RawTableProfile>(`/raw/${code}/profile/?table=${encodeURIComponent(table)}`),
   ruleColumns: (code: string, table: string) =>
     get<RuleColumns>(`/rules/${code}/?table=${encodeURIComponent(table)}`),
+  ruleSuggest: (code: string, table: string, column: string, wish: string) =>
+    post<RegexSuggestion>(`/rules/${code}/suggest/`, { table, column, wish }),
   rulePreview: (code: string, table: string, column: string, pattern: string) =>
     post<RulePreview>(`/rules/${code}/preview/`, { table, column, pattern }),
   ruleApply: (code: string, table: string, column: string, pattern: string) =>

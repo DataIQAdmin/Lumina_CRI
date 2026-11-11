@@ -2,6 +2,7 @@
 
 Each value depends only on the row's first ID and the column, so the same customer looks the same in every
 connector. About one value in ten is wrong on purpose (short phone, damaged Aadhaar, email without @...).
+Passport, voter ID and driving licence numbers follow the real Indian formats, so standard regexes work on them.
 """
 
 import random
@@ -20,6 +21,10 @@ PHONES = {"PhoneNumber", "AlternatePhoneNumber", "AlternateBusinessPhoneNumber",
           "WorkplacePhoneNumber"}
 PANS = {"PAN"}
 AADHAARS = {"AadhaarReferenceNumber"}
+PASSPORTS = {"PassportNumber"}
+VOTER_IDS = {"VoterID"}
+LICENCES = {"DrivingLicense"}
+STATES = ["KA", "MH", "TN", "DL", "TS", "WB", "GJ", "RJ", "UP", "KL"]
 
 
 def _digits(rng, count):
@@ -63,6 +68,39 @@ def _aadhaar(rng):
     return number
 
 
+def _passport(rng):
+    """One capital letter and 7 digits, like P1234567."""
+    number = rng.choice("ABCDEFGHJKLMNPRSTUVWY") + _digits(rng, 7)
+    roll = rng.random()
+    if roll < 0.04:
+        return ""
+    if roll < 0.08:
+        return number + rng.choice(string.digits)  # one digit too many
+    return number
+
+
+def _voter_id(rng):
+    """Three capital letters and 7 digits, like ABC1234567."""
+    number = "".join(rng.choices(string.ascii_uppercase, k=3)) + _digits(rng, 7)
+    roll = rng.random()
+    if roll < 0.04:
+        return ""
+    if roll < 0.08:
+        return number.lower()
+    return number
+
+
+def _licence(rng):
+    """State code, RTO number, year issued and 7 digits, like KA0120190012345."""
+    number = rng.choice(STATES) + f"{rng.randint(1, 99):02d}" + str(rng.randint(1990, 2024)) + _digits(rng, 7)
+    roll = rng.random()
+    if roll < 0.04:
+        return ""
+    if roll < 0.08:
+        return f"{number[:4]} {number[4:8]} {number[8:]}"  # typed with spaces
+    return number
+
+
 def _name(rng):
     return f"{rng.choice(FIRST)} {rng.choice(LAST)}"
 
@@ -100,6 +138,12 @@ def fake_table(header, rows):
             makers[i] = _pan
         elif column in AADHAARS:
             makers[i] = _aadhaar
+        elif column in PASSPORTS:
+            makers[i] = _passport
+        elif column in VOTER_IDS:
+            makers[i] = _voter_id
+        elif column in LICENCES:
+            makers[i] = _licence
         elif _is_email_column(rows, i):
             makers[i] = _email
     out = []
