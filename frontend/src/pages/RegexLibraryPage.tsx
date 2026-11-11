@@ -147,7 +147,7 @@ export function RegexLibraryPage() {
           {shown.length === 0 ? (
             <EmptyState icon="search" title="No column matches this regex" />
           ) : (
-            <div className="table-wrap">
+            <div className="table-wrap scroll-box">
               <table className="table">
                 <thead>
                   <tr>
@@ -192,7 +192,7 @@ export function RegexLibraryPage() {
       <Card flush title="Library" description="Test a regex above, or use it on Rules without writing it.">
         {!library.data && !library.error && <Loader kind="scan" label="Loading the library" />}
         {entries.length > 0 && (
-          <div className="table-wrap">
+          <div className="table-wrap scroll-box">
             <table className="table regex-ready">
               <thead>
                 <tr>

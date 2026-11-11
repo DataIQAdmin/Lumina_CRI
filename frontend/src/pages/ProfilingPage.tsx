@@ -327,7 +327,7 @@ function Counts({ code, table, canViewRows }: { code: string; table: string; can
         {shown.length === 0 ? (
           <EmptyState icon="search" title="No column matches" />
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap scroll-box">
             <table className="table counts-table">
               <thead>
                 <tr>

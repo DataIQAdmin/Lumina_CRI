@@ -4495,7 +4495,7 @@ button.link {
 }
 
 .raw-preview {
-  max-height: 560px;
+  max-height: var(--scroll-box);
   overflow: auto;
 }
 
@@ -4965,7 +4965,7 @@ button.link {
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 560px;
+  max-height: var(--scroll-box);
   overflow-y: auto;
 }
 
@@ -5587,7 +5587,7 @@ td.num .count-button {
 }
 
 .profiled-list {
-  max-height: 640px;
+  max-height: var(--scroll-box);
   margin: 0;
   padding: 0;
   overflow-y: auto;
@@ -5758,4 +5758,19 @@ td.num .count-button {
   .reason-row .bronze-bar {
     display: none;
   }
+}
+
+/* Long tables and lists scroll inside their own box, all the same height, with the header kept in view */
+:root {
+  --scroll-box: min(640px, 70vh);
+}
+
+.scroll-box {
+  max-height: var(--scroll-box);
+  overflow: auto;
+}
+
+.scroll-box > .table > thead th {
+  z-index: 2;
+  box-shadow: inset 0 -1px 0 var(--border);
 }
