@@ -60,7 +60,7 @@ export function HomePage() {
   const steps = [
     { done: all.length > 0, title: 'Connect a source', detail: sources.data ? `${n(all.length)} connected` : '…', action: 'Add another', to: '/sources' },
     { done: (c?.tables ?? 0) > 0, title: 'Check the data', detail: c ? `${n(c.tables)} tables checked` : '…', action: 'Check more', to: '/profiling' },
-    { done: (c?.rules ?? 0) > 0, title: 'Fix problems', detail: c ? `${n(c.rules)} format rule${c.rules === 1 ? '' : 's'}` : '…', action: 'Fix now', to: '/rules' },
+    { done: (c?.rules ?? 0) > 0, title: 'Fix problems', detail: c ? `${n(c.rules)} format rule${c.rules === 1 ? '' : 's'}` : '…', action: 'Fix now', to: '/profiling' },
     { done: false, title: 'Review customers', detail: 'Golden records are coming next', action: 'Open', to: '/customers' },
   ]
   const next = steps.findIndex((s) => !s.done)

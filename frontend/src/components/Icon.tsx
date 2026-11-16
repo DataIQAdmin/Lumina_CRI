@@ -12,6 +12,7 @@ const PATHS = {
   refresh: 'M20 11a8 8 0 0 0-14.9-3.5M4 4v4h4M4 13a8 8 0 0 0 14.9 3.5M20 20v-4h-4',
   check: 'M5 12.5l4.5 4.5L19 7.5',
   x: 'M6 6l12 12M18 6L6 18',
+  'chevron-right': 'M9 5l7 7-7 7',
   neq: 'M5 9h14M5 15h14M16 5L8 19',
   minus: 'M6 12h12',
   chevronRight: 'M9 6l6 6-6 6',

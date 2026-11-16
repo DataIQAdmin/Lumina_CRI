@@ -14,9 +14,8 @@ export function UnderBuildingPage({ title }: { title: string }) {
         </span>
         <h2>We are rebuilding this</h2>
         <p className="muted">
-          {title} will be back once the new data layers are ready. For now, you can follow the data from{' '}
-          <Link to="/profiling">Data profiling</Link> to <Link to="/rules">Rules</Link> and the{' '}
-          <Link to="/silver">Silver layer</Link>.
+          {title} will be back once the new data layers are ready. For now, use{' '}
+          <Link to="/profiling">Data quality</Link>.
         </p>
       </section>
     </>
