@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { api } from '../../api/client'
@@ -7,10 +8,12 @@ import { Icon } from '../Icon'
 import { Loader } from '../Loader'
 import { n, pct } from '../Lx'
 import { Bar } from './kit'
+import { RowsDialog } from './WorkStep'
 
 // Step 5: what this source is ready to give: clean rows per table and the customer fields mapped, with anything
 // still missing.
-export function ReadyStep({ code, source, list, canManage, onOpen, onMap }: { code: string; source: string; list: string[]; canManage: boolean; onOpen: (table: string) => void; onMap: () => void }) {
+export function ReadyStep({ code, source, list, canManage, canViewRows, onOpen, onMap }: { code: string; source: string; list: string[]; canManage: boolean; canViewRows: boolean; onOpen: (table: string) => void; onMap: () => void }) {
+  const [seeing, setSeeing] = useState<string | null>(null)
   const raw = useApi(() => api.rawTables(code), [code])
   const silver = useApi(() => (canManage ? api.silverTables(code) : Promise.resolve(null)), [code, canManage])
   const map = useApi(() => api.fieldMap(code), [code])
@@ -65,7 +68,14 @@ export function ReadyStep({ code, source, list, canManage, onOpen, onMap }: { co
             <h2>Your tables</h2>
           </div>
           {tables.map((t) => (
-            <div key={t.name} className="hm-row">
+            <button
+              key={t.name}
+              type="button"
+              className="hm-row dq-readyrow"
+              disabled={!t.raw || !canViewRows}
+              title={t.raw && canViewRows ? 'See its rows' : undefined}
+              onClick={() => setSeeing(t.name)}
+            >
               <div className="hm-grow">
                 <b>{t.name}</b>
                 <span className="muted text-sm">
@@ -77,7 +87,8 @@ export function ReadyStep({ code, source, list, canManage, onOpen, onMap }: { co
                   <Bar value={pct(t.clean.passed, t.clean.rows)} tone={pct(t.clean.passed, t.clean.rows) >= 90 ? 'good' : 'warn'} />
                 </span>
               ) : null}
-            </div>
+              {t.raw && canViewRows && <span className="link text-sm">See rows →</span>}
+            </button>
           ))}
         </section>
         <section className="card">
@@ -111,12 +122,16 @@ export function ReadyStep({ code, source, list, canManage, onOpen, onMap }: { co
         </section>
       </div>
 
+      {seeing && (
+        <RowsDialog code={code} source={source} name={seeing} table={tables.find((t) => t.name === seeing)?.clean} onClose={() => setSeeing(null)} />
+      )}
+
       <div className="dq-nav">
         <button type="button" className="btn" onClick={onMap}>
           ← Back to Map fields
         </button>
         <Link to="/customers" className="btn btn-primary">
-          Go to Customers →
+          Go to Match →
         </Link>
       </div>
     </>

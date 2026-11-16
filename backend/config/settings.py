@@ -65,6 +65,7 @@ TENANT_APPS = [
     'sources',
     'ingestion',
     'mdm',
+    'matching',
     'api',
     'accounts',
     'audit',

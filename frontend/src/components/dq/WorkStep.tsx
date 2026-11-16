@@ -1,7 +1,7 @@
 import { type ReactNode, useState, useSyncExternalStore } from 'react'
 
 import { api } from '../../api/client'
-import type { ColumnCounts, RawSource, RawTable, SilverTable } from '../../api/types'
+import type { ColumnCounts, RawSource, RawTable, SilverRows, SilverTable } from '../../api/types'
 import { useApi } from '../../api/useApi'
 import { formatRelative } from '../../format'
 import { profileJob } from '../../profileJob'
@@ -545,42 +545,56 @@ function Result({ code, source, table }: { code: string; source: string; table: 
           />
         </div>
       )}
-      {open && t && <RowsDialog code={code} source={source} table={t} onClose={() => setOpen(false)} />}
+      {open && t && <RowsDialog code={code} source={source} name={table} table={t} onClose={() => setOpen(false)} />}
     </Section>
   )
 }
 
-function RowsDialog({ code, source, table, onClose }: { code: string; source: string; table: SilverTable; onClose: () => void }) {
-  const [show, setShow] = useState<'passed' | 'rejected'>('passed')
+// A table's rows in a popup: clean and held back when it has rules, and always every row as it was read.
+export function RowsDialog({ code, source, name, table, onClose }: { code: string; source: string; name: string; table?: SilverTable; onClose: () => void }) {
+  const ruled = !!table?.rules
+  const [show, setShow] = useState<'passed' | 'rejected' | 'all'>(ruled ? 'passed' : 'all')
   const [page, setPage] = useState(1)
   const [only, setOnly] = useState('')
-  const rows = useApi(() => api.silverRows(code, table.name, show, page, only), [code, table.name, show, page, only])
+  const rows = useApi(
+    () =>
+      show === 'all'
+        ? api.rawRows(code, name, page).then((r) => ({ column_names: r.column_names, count: r.count, page_size: r.page_size, reasons: [] as SilverRows['reasons'], results: r.results.map((values, i) => ({ position: i, values, failed: [] as string[] })) }))
+        : api.silverRows(code, name, show, page, only),
+    [code, name, show, page, only],
+  )
   const d = rows.data
-  const pages = Math.max(1, Math.ceil((d?.count ?? 0) / 50))
-  const choose = (next: 'passed' | 'rejected') => {
+  const pages = Math.max(1, Math.ceil((d?.count ?? 0) / (d?.page_size || 50)))
+  const choose = (next: 'passed' | 'rejected' | 'all') => {
     setShow(next)
     setPage(1)
     setOnly('')
   }
+  const options = [
+    ...(ruled
+      ? [
+          { value: 'passed' as const, label: `Clean · ${n(table!.passed)}` },
+          { value: 'rejected' as const, label: `Held back · ${n(table!.rejected)}` },
+        ]
+      : []),
+    { value: 'all' as const, label: 'All rows' },
+  ]
   return (
-    <Dialog size="xl" title={`Rows of ${table.name}`} subtitle={`${source} · ${n(table.passed)} clean · ${n(table.rejected)} held back`} onClose={onClose}>
+    <Dialog
+      size="xl"
+      title={`Rows of ${name}`}
+      subtitle={ruled ? `${source} · ${n(table!.passed)} clean · ${n(table!.rejected)} held back` : `${source} · no rules yet, so no row is clean`}
+      onClose={onClose}
+    >
       <div className="dq-bar-row">
-        <Seg
-          label="Rows to show"
-          value={show}
-          onChange={choose}
-          options={[
-            { value: 'passed', label: `Clean · ${n(table.passed)}` },
-            { value: 'rejected', label: `Held back · ${n(table.rejected)}` },
-          ]}
-        />
+        <Seg label="Rows to show" value={show} onChange={choose} options={options} />
         {only && (
           <button type="button" className="btn btn-sm" onClick={() => setOnly('')}>
             Breaking {only} <Icon name="x" size={13} />
           </button>
         )}
       </div>
-      {d && d.reasons.length > 0 && (
+      {show !== 'all' && d && d.reasons.length > 0 && (
         <div className="dq-reasons is-inline">
           <span className="lx-cap">Why rows are held back</span>
           {d.reasons.map((r) => (
@@ -599,14 +613,14 @@ function RowsDialog({ code, source, table, onClose }: { code: string; source: st
                 <span>{r.column}</span>
                 <span className="num muted text-sm">{n(r.rows)} rows</span>
               </span>
-              <Bar value={pct(r.rows, Math.max(table.rejected, 1))} tone="bad" />
+              <Bar value={pct(r.rows, Math.max(table?.rejected ?? 1, 1))} tone="bad" />
             </button>
           ))}
         </div>
       )}
       {rows.error && <ErrorAlert message={rows.error} />}
       {!d && !rows.error && <Loader kind="scan" label="Loading rows" />}
-      {d && d.results.length === 0 && <p className="muted">{show === 'passed' ? 'No row passed every rule.' : 'No row is held back.'}</p>}
+      {d && d.results.length === 0 && <p className="muted">{show === 'passed' ? 'No row passed every rule.' : show === 'rejected' ? 'No row is held back.' : 'This table has no rows.'}</p>}
       {d && d.results.length > 0 && (
         <div className="table-wrap dq-rows">
           <table className="lx-table lx-data">
@@ -622,7 +636,7 @@ function RowsDialog({ code, source, table, onClose }: { code: string; source: st
                 <tr key={r.position}>
                   {d.column_names.map((c, i) => (
                     <td key={c} className={r.failed.includes(c) ? 'is-fail' : undefined}>
-                      {r.values[i] === null || r.values[i] === '' ? <span className="muted">Empty</span> : String(r.values[i])}
+                      {r.values[i] === null || r.values[i] === undefined || r.values[i] === '' ? <span className="muted">Empty</span> : String(r.values[i])}
                     </td>
                   ))}
                 </tr>

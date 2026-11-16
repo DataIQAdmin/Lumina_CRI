@@ -2,6 +2,8 @@
 
 import type {
   MappingChoice,
+  MatchPairRow,
+  MatchSummary,
   RuleExamples,
   SourceMapping,
   AccountsMapping,
@@ -259,6 +261,18 @@ export const api = {
   regexTest: (code: string, table: string, pattern: string) =>
     post<{ columns: { column: string; matched: number; filled: number }[] }>('/regex/test/', { code, table, pattern }),
   silverTables: (code: string) => get<{ code: string; name: string; tables: SilverTable[] }>(`/silver/${code}/`),
+  rawRows: (code: string, table: string, page: number) =>
+    get<{ column_names: string[]; page: number; page_size: number; count: number; results: unknown[][] }>(
+      `/raw/${code}/rows/?${new URLSearchParams({ table, page: String(page) })}`,
+    ),
+  match: () => get<MatchSummary>('/match/'),
+  matchRun: () => post<MatchSummary['summary']>('/match/run/'),
+  matchPairs: (show: string, q: string, page: number) =>
+    get<{ count: number; page: number; page_size: number; results: MatchPairRow[] }>(
+      `/match/pairs/?${new URLSearchParams({ show, q, page: String(page) })}`,
+    ),
+  matchPair: (id: number) => get<MatchPairRow>(`/match/pairs/${id}/`),
+  matchDecide: (id: number, same: boolean) => post<MatchPairRow>(`/match/pairs/${id}/decide/`, { same }),
   silverRows: (code: string, table: string, show: 'passed' | 'rejected', page: number, failed = '') =>
     get<SilverRows>(
       `/silver/${code}/rows/?${new URLSearchParams({ table, show, page: String(page), ...(failed ? { failed } : {}) })}`,

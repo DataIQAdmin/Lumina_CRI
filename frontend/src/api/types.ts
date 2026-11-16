@@ -711,3 +711,57 @@ export interface RuleExamples {
   total_failed: number
   more: boolean
 }
+
+// Matching (backend matching/): profiles of one customer per source, pairs that may be the same person.
+export interface MatchSummary {
+  summary: {
+    profiles: number
+    per_source: Record<string, number>
+    people: number
+    matched: number
+    confirmed: number
+    review: number
+    conflicts: number
+    rejected: number
+  }
+  ran_at: string | null
+  ran_by: string
+  points: Record<string, number>
+  auto: number
+  review: number
+  can_run: boolean
+  can_decide: boolean
+}
+
+export interface MatchSide {
+  id: number
+  source: string
+  source_code: string
+  key: string
+  name: string
+  person: string
+  updated_at?: string | null
+}
+
+export interface MatchPoint {
+  field: string
+  label: string
+  result: 'same' | 'similar' | 'different' | 'missing'
+  points: number
+  detail: string
+  a: string
+  b: string
+}
+
+export interface MatchPairRow {
+  id: number
+  score: number
+  status: 'matched' | 'review' | 'confirmed' | 'rejected'
+  conflicts: string[]
+  a: MatchSide
+  b: MatchSide
+  same: string[]
+  decided_by: string
+  decided_at: string | null
+  points?: MatchPoint[]
+}

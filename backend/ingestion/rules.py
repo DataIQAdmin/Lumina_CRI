@@ -157,3 +157,14 @@ def examples(table, column, pattern="", page=1):
     return {"mode": "regex" if pattern else "shape", "usual": usual or "", "passed": pick(True), "failed": pick(False),
             "total_passed": passed, "total_failed": len(judged) - passed,
             "more": max(passed, len(judged) - passed) > start + EXAMPLES}
+
+
+def clean_rows(table):
+    """[(position, readable values, values for the screen)] of the rows passing every rule of the table: its
+    silver rows. A table with no rule has none. Readable values are for checking only; never send them on."""
+    rules = [(table.columns.index(c), compile_rule(p)) for c, p in table_rules(table).items()]
+    if not rules:
+        return []
+    clock = Clock()
+    return [(position, plain, shown) for position, plain, shown in rows_of(table)
+            if all(clock.matches(compiled, text_of(plain[i])) for i, compiled in rules)]
