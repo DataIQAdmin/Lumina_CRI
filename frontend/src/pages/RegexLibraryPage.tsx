@@ -8,7 +8,7 @@ import { Loader } from '../components/Loader'
 import { n, pct, Pill, Seg } from '../components/Lx'
 import { useToast } from '../components/Toasts'
 import { EmptyState, ErrorAlert, PageHeader } from '../components/ui'
-import { RegexVerdict, useRegexCheck } from './RulesPage'
+import { RegexVerdict, useRegexCheck } from '../components/regex'
 
 interface Fit {
   code: string
@@ -20,7 +20,7 @@ interface Fit {
 }
 
 const rulesLink = (pattern: string, place: Record<string, string> = {}) =>
-  `/rules?${new URLSearchParams({ ...place, regex: pattern })}`
+  `/profiling?${new URLSearchParams({ ...place, ...(place.table ? { tab: 'fix' } : {}), regex: pattern })}`
 
 // Regex library: a tester on top (try a regex on every profiled table, best fit first, and keep it), then the
 // ready-made and saved regexes as cards to test or use in a rule.
