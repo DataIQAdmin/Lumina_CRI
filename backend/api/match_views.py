@@ -12,7 +12,8 @@ from accounts.roles import can
 from audit.models import AuditEvent
 from audit.services import record
 from matching import service
-from matching.models import MatchPair, MatchRun, Profile
+from matching import golden
+from matching.models import GoldenApproval, MatchPair, MatchRun, Profile
 from matching.score import AUTO, POINTS, REVIEW
 from matching.trust import person_score
 
@@ -131,7 +132,12 @@ def _person(person, profiles, pii):
 @permission_classes([HasRole])
 def people(request):
     """GET /api/people/?band=High|Good|Review|Low&q=&page=1  Every person with their trust score, lowest first."""
-    everyone = [_person(k, v, True) for k, v in _people().items()]
+    groups = _people()
+    everyone = [_person(k, v, True) for k, v in groups.items()]
+    approvals = {a.person: a for a in GoldenApproval.objects.filter(person__in=groups)}
+    for x in everyone:
+        a = approvals.get(x["person"])
+        x["approved"] = bool(a) and a.fingerprint == golden.fingerprint(golden.build(groups[x["person"]]))
     bands = {b: sum(1 for x in everyone if x["band"] == b) for b in ("High", "Good", "Review", "Low")}
     band = request.query_params.get("band", "")
     q = request.query_params.get("q", "").strip().lower()
@@ -147,16 +153,69 @@ def people(request):
                      "results": shown[(page - 1) * PAGE: page * PAGE]})
 
 
+def _record(p, pii):
+    return {"id": p.id, "source": p.source.name, "key": p.key, "trust": p.trust, "band": p.band, "parts": p.parts,
+            "holds": p.holds, "rows": p.rows, "updated_at": p.updated_at,
+            "values": p.values if pii else {"name": p.values.get("name", "")}}
+
+
+def _golden_json(rows, pii):
+    hide = lambda field, value: value if pii or field == "name" else "Hidden"  # noqa: E731
+    side = lambda r: {"id": r.id, "source": r.source.name, "key": r.key} if r else None  # noqa: E731
+    return [{"field": x["field"], "label": x["label"], "rule": x["rule"], "value": hide(x["field"], x["value"]) if x["value"] else "",
+             "record": side(x["record"]), "why": x["why"], "conflict": x["conflict"],
+             "others": [{"record": side(o["record"]), "value": hide(x["field"], o["value"]), "why": o["why"], "same": o["same"]}
+                        for o in x["others"]]} for x in rows]
+
+
 @api_view(["GET"])
 @permission_classes([HasRole])
 def person(request, person):
-    """GET /api/people/<person>/  One person: their score, and each of their records with the five rules."""
+    """GET /api/people/<person>/  One person: the golden record field by field (chosen value, source, why, and the
+    values not chosen with why), their trust score, and each record with the five rules."""
     found = list(Profile.objects.select_related("source").filter(person=person).order_by("-trust"))
     if not found:
         return Response({"detail": "No such person."}, status=status.HTTP_404_NOT_FOUND)
     pii = can(request.user, "view_pii")
+    rows = golden.build(found)
+    approval = GoldenApproval.objects.filter(person=person).first()
     out = _person(person, found, pii)
-    out["records"] = [{"id": p.id, "source": p.source.name, "key": p.key, "trust": p.trust, "band": p.band,
-                       "parts": p.parts, "holds": p.holds, "rows": p.rows, "updated_at": p.updated_at,
-                       "values": p.values if pii else {"name": p.values.get("name", "")}} for p in found]
+    out["records"] = [_record(p, pii) for p in found]
+    out["golden"] = _golden_json(rows, pii)
+    out["approval"] = {"by": approval.approved_by, "at": approval.approved_at,
+                       "current": approval.fingerprint == golden.fingerprint(rows)} if approval else None
+    out["can_decide"] = can(request.user, "decide_matches")
     return Response(out)
+
+
+@api_view(["POST"])
+@permission_classes([HasRole, requires("decide_matches")])
+def approve(request, person):
+    """POST /api/people/<person>/approve/  Approve the golden record as it stands now."""
+    found = list(Profile.objects.select_related("source").filter(person=person))
+    if not found:
+        return Response({"detail": "No such person."}, status=status.HTTP_404_NOT_FOUND)
+    rows = golden.build(found)
+    if any(x["conflict"] for x in rows):
+        return Response({"detail": "Some identity details differ between sources. Settle them first: keep a record "
+                                   "apart, or fix the value at its source."}, status=status.HTTP_400_BAD_REQUEST)
+    GoldenApproval.objects.update_or_create(person=person, defaults={"fingerprint": golden.fingerprint(rows),
+                                                                     "approved_by": request.user.username})
+    record(request, AuditEvent.MERGE, target=f"golden {person}", approved=True)
+    return Response({"approved": True})
+
+
+@api_view(["POST"])
+@permission_classes([HasRole, requires("decide_matches")])
+def keep_apart(request, person):
+    """POST /api/people/<person>/keep-apart/  {record: id}  Take one record out of this person."""
+    found = Profile.objects.filter(person=person, id=request.data.get("record")).first()
+    if found is None:
+        return Response({"detail": "That record is not part of this person."}, status=status.HTTP_404_NOT_FOUND)
+    if not Profile.objects.filter(person=person).exclude(id=found.id).exists():
+        return Response({"detail": "This person has only that record."}, status=status.HTTP_400_BAD_REQUEST)
+    others = list(Profile.objects.filter(person=person).exclude(id=found.id).values_list("id", flat=True))
+    count = service.keep_apart(found, request.user.username)
+    record(request, AuditEvent.KEEP_APART, target=f"golden {person}", record=str(found), links=count)
+    stays = Profile.objects.filter(id__in=others).values_list("person", flat=True).first()
+    return Response({"moved_to": found.person, "stays": stays, "links": count})

@@ -776,6 +776,7 @@ export interface PersonRow {
   band: TrustBand | ''
   holds: string[]
   sources: { source: string; key: string; score: number | null; band: TrustBand | '' }[]
+  approved?: boolean
 }
 
 export interface PeoplePage {
@@ -792,7 +793,21 @@ export interface TrustPart {
   why: string
 }
 
+export interface GoldenValue {
+  field: string
+  label: string
+  rule: string
+  value: string
+  record: { id: number; source: string; key: string } | null
+  why: string
+  conflict: boolean
+  others: { record: { id: number; source: string; key: string }; value: string; why: string; same: boolean }[]
+}
+
 export interface PersonDetail extends PersonRow {
+  golden: GoldenValue[]
+  approval: { by: string; at: string; current: boolean } | null
+  can_decide: boolean
   records: {
     id: number
     source: string

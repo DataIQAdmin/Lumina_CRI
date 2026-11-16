@@ -16,13 +16,13 @@ def _models():
     from compliance.models import ConsentRecord, KycRecord
     from ingestion.models import ColumnRule, FieldMap, RawRecord, RawTable, SourceRecord
     from interactions.models import Interaction
-    from matching.models import MatchPair, MatchRun, Profile
+    from matching.models import GoldenApproval, MatchPair, MatchRun, Profile
     from mdm.models import Customer, CustomerLink, FieldCorrection, GoldenField, MatchSuggestion
     from products.models import Holding
     from sources.models import SyncRun, UploadedFile
 
     # In delete order: each one before what it points to.
-    return [MatchPair, MatchRun, Profile, GoldenField, FieldCorrection, Interaction, MatchSuggestion, CustomerLink, Customer, Holding, KycRecord,
+    return [GoldenApproval, MatchPair, MatchRun, Profile, GoldenField, FieldCorrection, Interaction, MatchSuggestion, CustomerLink, Customer, Holding, KycRecord,
             ConsentRecord, SourceRecord, RawRecord, ColumnRule, FieldMap, RawTable, SyncRun, UploadedFile]
 
 

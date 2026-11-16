@@ -7,6 +7,7 @@ Decisions people made ("same person", "not the same") are kept across runs.
 from collections import defaultdict
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from ingestion.models import FieldMap, RawTable
@@ -174,3 +175,17 @@ def decide(pair, same, user=""):
     score_all()
     pair.a.refresh_from_db(fields=["person"])
     pair.b.refresh_from_db(fields=["person"])
+
+
+@transaction.atomic
+def keep_apart(profile, user=""):
+    """Take one record out of its person: every link between it and the person's other records becomes "not the
+    same", so matching again keeps them apart too."""
+    others = Profile.objects.filter(person=profile.person).exclude(id=profile.id)
+    links = MatchPair.objects.filter(status__in=[MatchPair.MATCHED, MatchPair.CONFIRMED]).filter(
+        Q(a=profile, b__in=others) | Q(b=profile, a__in=others))
+    count = links.update(status=MatchPair.REJECTED, decided_by=user, decided_at=timezone.now())
+    regroup()
+    score_all()
+    profile.refresh_from_db(fields=["person"])
+    return count

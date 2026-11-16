@@ -270,6 +270,9 @@ export const api = {
   people: (band: string, q: string, page: number) =>
     get<PeoplePage>(`/people/?${new URLSearchParams({ band, q, page: String(page) })}`),
   person: (id: string) => get<PersonDetail>(`/people/${encodeURIComponent(id)}/`),
+  approveGolden: (id: string) => post<{ approved: boolean }>(`/people/${encodeURIComponent(id)}/approve/`),
+  keepApart: (id: string, record: number) =>
+    post<{ moved_to: string; stays: string; links: number }>(`/people/${encodeURIComponent(id)}/keep-apart/`, { record }),
   match: () => get<MatchSummary>('/match/'),
   matchRun: () => post<MatchSummary['summary']>('/match/run/'),
   matchPairs: (show: string, q: string, page: number) =>

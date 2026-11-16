@@ -70,3 +70,13 @@ class MatchRun(models.Model):
 
     class Meta:
         ordering = ["-ran_at"]
+
+
+class GoldenApproval(models.Model):
+    """Someone approved a person's golden record as it stood. It stays approved only while the record says the same
+    thing (fingerprint); a change after matching again shows as changed since approval."""
+
+    person = models.CharField(max_length=20, unique=True)
+    fingerprint = models.TextField()
+    approved_by = models.CharField(max_length=150)
+    approved_at = models.DateTimeField(auto_now=True)
