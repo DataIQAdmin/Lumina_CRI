@@ -8300,3 +8300,10 @@ td.num .count-button {
   cursor: default;
   opacity: 0.6;
 }
+
+/* "How we got this" cards sit above everything, popups included. */
+.xp-card {
+  z-index: 80;
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+}
