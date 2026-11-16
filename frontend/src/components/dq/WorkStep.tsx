@@ -563,7 +563,7 @@ function RowsDialog({ code, source, table, onClose }: { code: string; source: st
     setOnly('')
   }
   return (
-    <Dialog size="lg" title={`Rows of ${table.name}`} subtitle={`${source} · ${n(table.passed)} clean · ${n(table.rejected)} held back`} onClose={onClose}>
+    <Dialog size="xl" title={`Rows of ${table.name}`} subtitle={`${source} · ${n(table.passed)} clean · ${n(table.rejected)} held back`} onClose={onClose}>
       <div className="dq-bar-row">
         <Seg
           label="Rows to show"
