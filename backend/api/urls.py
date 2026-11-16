@@ -1,7 +1,8 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from . import admin_views, connector_views, ingest_views, interaction_views, profiling_views, raw_views, rule_views, views
+from . import (admin_views, connector_views, ingest_views, interaction_views, mapping_views, profiling_views, raw_views,
+               rule_views, views)
 
 router = DefaultRouter()
 router.register("sources", views.SourceViewSet, basename="source")
@@ -21,6 +22,7 @@ urlpatterns = [
     path("raw/<slug:code>/rows/", raw_views.rows),
     path("raw/<slug:code>/proof/", raw_views.proof),
     path("raw/<slug:code>/profile/", raw_views.profile),
+    path("mapping/<slug:code>/", mapping_views.mapping),
     path("rules/<slug:code>/", rule_views.rules),
     path("rules/<slug:code>/preview/", rule_views.preview),
     path("rules/<slug:code>/suggest/", rule_views.suggest),

@@ -4,6 +4,8 @@ Everyone with a role sees which tables were profiled and their counts; stewards 
 the rows themselves need the view_pii capability. Identity numbers are masked, so no role sees them readable here.
 """
 
+from collections import Counter
+
 from django.db.models import Count, Max
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -69,8 +71,9 @@ def tables(request, code):
     source, error = _source(code)
     if error:
         return error
+    mapped = Counter(source.field_maps.values_list("table", flat=True))
     return Response({"code": source.code, "name": source.name,
-                     "tables": [_table_json(t) for t in source.raw_tables.all()]})
+                     "tables": [{**_table_json(t), "mapped": mapped[t.name]} for t in source.raw_tables.all()]})
 
 
 @api_view(["POST"])

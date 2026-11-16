@@ -566,6 +566,7 @@ export interface RawTable {
   to_check?: number // columns with empty values, mixed lengths or too-long emails
   mixed: number // columns with mixed lengths
   with_empty: number // columns with empty values
+  mapped?: number // standard fields mapped on this table
 }
 
 export interface Pipeline {
@@ -670,4 +671,28 @@ export interface SilverRows {
   rejected: number
   reasons: { column: string; rows: number }[]
   results: { position: number; values: unknown[]; failed: string[] }[]
+}
+
+// Field mapping: which column of a table holds which standard customer field (backend ingestion/fields.py).
+export interface StandardField {
+  key: string
+  label: string
+  group: string
+  needed: boolean
+  about: string
+}
+
+export interface TableMapping {
+  fields: StandardField[]
+  columns: { name: string; samples: string[] }[]
+  mapped: Record<string, string>
+  suggested: Record<string, string>
+  saved_by: string
+  saved_at: string | null
+  can_edit: boolean
+}
+
+export interface SourceMapping {
+  fields: StandardField[]
+  tables: { name: string; fields: Record<string, string> }[]
 }

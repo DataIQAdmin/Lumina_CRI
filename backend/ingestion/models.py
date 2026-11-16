@@ -137,3 +137,22 @@ class SavedRegex(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class FieldMap(models.Model):
+    """Which column of a table holds one standard customer field (ingestion/fields.py), e.g. customer_master's
+    "CustomerName" is the name. Kept by name, so it survives reading the table again."""
+
+    source = models.ForeignKey(Source, on_delete=models.CASCADE, related_name="field_maps")
+    table = models.CharField(max_length=200)
+    field = models.CharField(max_length=40)
+    column = models.CharField(max_length=200)
+    mapped_by = models.CharField(max_length=150, blank=True)
+    mapped_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["source", "table", "field"]
+        constraints = [models.UniqueConstraint(fields=["source", "table", "field"], name="unique_field_per_table")]
+
+    def __str__(self):
+        return f"{self.source.code}:{self.table}.{self.column} -> {self.field}"

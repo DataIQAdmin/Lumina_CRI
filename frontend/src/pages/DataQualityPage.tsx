@@ -11,16 +11,18 @@ import { Explain } from '../components/Explain'
 import { Icon } from '../components/Icon'
 import { Loader } from '../components/Loader'
 import { Legend, n, pct, Pill, Seg, Split, type Part } from '../components/Lx'
+import { MapFields } from '../components/MapFields'
 import { RuleDialog } from '../components/RuleDialog'
 import { EmptyState, ErrorAlert } from '../components/ui'
 import { formatRelative } from '../format'
 import { profileJob } from '../profileJob'
 
-type Tab = 'check' | 'fix' | 'clean'
+type Tab = 'check' | 'fix' | 'clean' | 'map'
 const TABS: { id: Tab; label: string }[] = [
   { id: 'check', label: 'Check' },
   { id: 'fix', label: 'Fix' },
   { id: 'clean', label: 'Clean data' },
+  { id: 'map', label: 'Map fields' },
 ]
 const PER_PAGE = 25
 
@@ -48,14 +50,14 @@ export function DataQualityPage() {
   const src = list.find((s) => s.code === params.get('source'))
   const table = src ? params.get('table') : null
   const asked = params.get('tab') as Tab | null
-  const tab: Tab = asked && TABS.some((t) => t.id === asked) && (asked === 'check' || canManage) ? asked : 'check'
+  const tab: Tab = asked && TABS.some((t) => t.id === asked) && (asked === 'check' || asked === 'map' || canManage) ? asked : 'check'
   const at = !src ? 0 : !table ? 1 : 2
   const info = (code: string) => all.data?.results.find((s) => s.code === code)
 
   const steps = [
     { title: 'Choose a source', detail: src?.name ?? 'Where the data lives' },
     { title: 'Choose a table', detail: table ?? 'What to look at' },
-    { title: 'Check, fix, clean', detail: table ? TABS.find((t) => t.id === tab)!.label : 'Find and fix problems' },
+    { title: 'Check, fix, clean, map', detail: table ? TABS.find((t) => t.id === tab)!.label : 'Find and fix problems' },
   ]
   const toStep = (i: number) => {
     if (i > at) setNotYet(at === 0 ? 'source' : 'table')
@@ -150,7 +152,7 @@ export function DataQualityPage() {
           <p className="rd-lead">
             {notYet === 'source'
               ? 'Choose the source you want to work on. Its tables appear next.'
-              : "Choose one of this source's tables. Then you can check it, fix it and see the clean rows."}
+              : "Choose one of this source's tables. Then you can check it, fix it, see the clean rows and map its fields."}
           </p>
         </Dialog>
       )}
@@ -348,6 +350,7 @@ function TablesStep({
                   <th>Rows</th>
                   <th>Filled</th>
                   <th>Needs attention</th>
+                  <th>Fields mapped</th>
                   <th aria-label="Open" />
                 </tr>
               </thead>
@@ -389,13 +392,14 @@ function TablesStep({
                           '—'
                         )}
                       </td>
+                      <td className="num muted">{d?.mapped ? n(d.mapped) : '—'}</td>
                       <td className="dq-go">{d && <Icon name="chevron-right" size={16} />}</td>
                     </tr>
                   )
                 })}
                 {slice.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="muted sx-empty">
+                    <td colSpan={7} className="muted sx-empty">
                       No table matches.
                     </td>
                   </tr>
@@ -507,16 +511,14 @@ function TableStep({
         }
       />
       {flow}
-      {canManage && (
-        <div className="dq-tabs" role="tablist">
-          {TABS.map((t) => (
+      <div className="dq-tabs" role="tablist">
+          {TABS.filter((t) => canManage || t.id === 'check' || t.id === 'map').map((t) => (
             <button key={t.id} type="button" role="tab" aria-selected={t.id === tab} className={t.id === tab ? 'is-on' : undefined} onClick={() => toTab(t.id)}>
               {t.label}
               {t.id === 'fix' && attention.length > 0 && <span className="dq-count">{attention.length}</span>}
             </button>
           ))}
         </div>
-      )}
       {tab === 'check' && (
         <CheckTab
           code={source.code}
@@ -539,6 +541,7 @@ function TableStep({
         />
       )}
       {tab === 'clean' && <CleanTab code={source.code} table={table} onFix={() => toTab('fix')} />}
+      {tab === 'map' && <MapFields code={source.code} source={source.name} table={table} />}
     </>
   )
 }
