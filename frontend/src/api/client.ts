@@ -1,8 +1,9 @@
 // One place that talks to the backend. Every page calls the functions at the bottom, never fetch() directly.
 
 import type {
+  MappingChoice,
+  RuleExamples,
   SourceMapping,
-  TableMapping,
   AccountsMapping,
   AuditEvent,
   Briefing,
@@ -237,10 +238,10 @@ export const api = {
     ),
   rawProfile: (code: string, table: string) =>
     get<RawTableProfile>(`/raw/${code}/profile/?table=${encodeURIComponent(table)}`),
-  fieldMap: (code: string, table: string) => get<TableMapping>(`/mapping/${code}/?table=${encodeURIComponent(table)}`),
-  fieldMapOverview: (code: string) => get<SourceMapping>(`/mapping/${code}/`),
-  saveFieldMap: (code: string, table: string, fields: Record<string, string>) =>
-    put<{ mapped: Record<string, string> }>(`/mapping/${code}/`, { table, fields }),
+  fieldMap: (code: string) => get<SourceMapping>(`/mapping/${code}/`),
+  saveFieldMap: (code: string, mapping: MappingChoice) => put<{ saved: number }>(`/mapping/${code}/`, mapping),
+  ruleExamples: (code: string, table: string, column: string, pattern: string, page: number) =>
+    post<RuleExamples>(`/rules/${code}/examples/`, { table, column, pattern, page }),
   ruleColumns: (code: string, table: string) =>
     get<RuleColumns>(`/rules/${code}/?table=${encodeURIComponent(table)}`),
   ruleSuggest: (code: string, table: string, column: string, wish: string) =>

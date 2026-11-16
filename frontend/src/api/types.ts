@@ -682,17 +682,32 @@ export interface StandardField {
   about: string
 }
 
-export interface TableMapping {
+export type Place = { table: string; column: string }
+export type Links = Record<string, { customer_id?: string; updated_at?: string }>
+
+export interface MappingChoice {
+  fields: Record<string, Place | null>
+  links: Links
+}
+
+export interface SourceMapping {
   fields: StandardField[]
-  columns: { name: string; samples: string[] }[]
-  mapped: Record<string, string>
-  suggested: Record<string, string>
+  per_table: string[]
+  tables: { name: string; rows: number; columns: { name: string; samples: string[] }[] }[]
+  mapped: { fields: Record<string, Place>; links: Links }
+  suggested: { fields: Record<string, Place>; links: Links }
   saved_by: string
   saved_at: string | null
   can_edit: boolean
 }
 
-export interface SourceMapping {
-  fields: StandardField[]
-  tables: { name: string; fields: Record<string, string> }[]
+// "See 10 records" while writing a rule (backend ingestion/rules.py examples).
+export interface RuleExamples {
+  mode: 'regex' | 'shape'
+  usual: string
+  passed: { row: number; value: unknown; label: string }[]
+  failed: { row: number; value: unknown; label: string }[]
+  total_passed: number
+  total_failed: number
+  more: boolean
 }

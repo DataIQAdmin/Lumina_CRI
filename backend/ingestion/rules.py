@@ -124,3 +124,36 @@ def test_table(table, pattern):
             matched = sum(clock.matches(compiled, v) for v in filled)
             out.append({"column": column, "matched": matched, "filled": len(filled)})
     return sorted(out, key=lambda c: -c["matched"] / c["filled"])
+
+
+EXAMPLES = 5
+
+
+def examples(table, column, pattern="", page=1):
+    """Values to look at and copy while writing a rule: EXAMPLES that pass and EXAMPLES that fail the regex, a page
+    at a time. Without a regex: values of the column's usual shape (its most common length, or one of its listed
+    values) and values that need a look. Values are as the screen shows them (identity numbers masked)."""
+    from .bronze import label_of
+
+    i = table.columns.index(column)
+    rows = rows_of(table)
+    profiled = next((c for c in (table.profile or {}).get("columns", []) if c["name"] == column), {})
+    usual = (profiled.get("counts") or [{}])[0].get("label")
+    if pattern:
+        compiled = compile_rule(pattern)
+        clock = Clock()
+        judged = [(p, shown[i], label_of(profiled, plain[i]), clock.matches(compiled, text_of(plain[i])))
+                  for p, plain, shown in rows]
+    else:
+        judged = []
+        for p, plain, shown in rows:
+            label = label_of(profiled, plain[i])
+            fine = label != "Empty" and (label == usual if usual else True)
+            judged.append((p, shown[i], label, fine))
+    start = (page - 1) * EXAMPLES
+    pick = lambda ok: [{"row": p + 1, "value": v, "label": label or ""}
+                       for p, v, label, good in judged if good == ok][start:start + EXAMPLES]
+    passed = sum(1 for j in judged if j[3])
+    return {"mode": "regex" if pattern else "shape", "usual": usual or "", "passed": pick(True), "failed": pick(False),
+            "total_passed": passed, "total_failed": len(judged) - passed,
+            "more": max(passed, len(judged) - passed) > start + EXAMPLES}

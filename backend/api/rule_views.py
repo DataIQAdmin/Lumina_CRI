@@ -19,6 +19,7 @@ from ingestion.regex_ai import AiError
 from ingestion.regex_ai import suggest as ai_suggest
 from ingestion.regex_library import READY_REGEXES
 from ingestion.rules import RuleError, compile_rule, split, table_rules
+from ingestion.rules import examples as rule_examples
 from ingestion.rules import preview as preview_rule
 from ingestion.rules import test_table as test_rule
 from sources.models import Source
@@ -113,6 +114,27 @@ def suggest(request, code):
         return Response(ai_suggest(table, column, str(request.data.get("wish") or "")))
     except AiError as exc:
         return _bad(str(exc))  # not 503: the screen reads 502-504 as "the server is waking up" and waits
+
+
+@api_view(["POST"])
+@permission_classes(ROWS)
+def examples(request, code):
+    """POST /api/rules/<code>/examples/  {table, column, pattern?, page}  Rows to copy while writing a rule: 5 that
+    pass and 5 that fail the regex, or without one, 5 of the usual shape and 5 that need a look."""
+    name, column, pattern = _column_from(request)
+    table, error = _table_from(code, name)
+    if error:
+        return error
+    if column not in table.columns:
+        return _bad("This table has no such column.")
+    try:
+        page = max(int(request.data.get("page") or 1), 1)
+    except (TypeError, ValueError):
+        page = 1
+    try:
+        return Response(rule_examples(table, column, pattern, page))
+    except RuleError as exc:
+        return _bad(str(exc))
 
 
 @api_view(["POST"])

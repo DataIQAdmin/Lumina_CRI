@@ -13,6 +13,7 @@ const PATHS = {
   check: 'M5 12.5l4.5 4.5L19 7.5',
   x: 'M6 6l12 12M18 6L6 18',
   'chevron-right': 'M9 5l7 7-7 7',
+  copy: 'M9 9h10v10H9zM15 9V5H5v10h4',
   neq: 'M5 9h14M5 15h14M16 5L8 19',
   minus: 'M6 12h12',
   chevronRight: 'M9 6l6 6-6 6',
