@@ -25,6 +25,8 @@ urlpatterns = [
     path("mapping/<slug:code>/", mapping_views.mapping),
     path("people/", match_views.people),
     path("people/<str:person>/", match_views.person),
+    path("people/<str:person>/approve/", match_views.approve),
+    path("people/<str:person>/keep-apart/", match_views.keep_apart),
     path("match/", match_views.summary),
     path("match/run/", match_views.run),
     path("match/pairs/", match_views.pairs),

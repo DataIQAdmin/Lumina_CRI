@@ -1,15 +1,14 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { api } from '../../api/client'
 import type { PersonDetail, TrustBand } from '../../api/types'
 import { useApi } from '../../api/useApi'
-import { formatRelative } from '../../format'
-import { Dialog } from '../Dialog'
 import { Bar, Pager } from '../dq/kit'
 import { Explain } from '../Explain'
 import { Icon } from '../Icon'
 import { Loader } from '../Loader'
-import { n, Pill, Seg } from '../Lx'
+import { n, Pill } from '../Lx'
 import { ErrorAlert } from '../ui'
 
 const BANDS: { band: TrustBand; label: string; range: string; tone: 'ok' | 'warn' | 'bad' | 'plain' }[] = [
@@ -19,6 +18,7 @@ const BANDS: { band: TrustBand; label: string; range: string; tone: 'ok' | 'warn
   { band: 'Low', label: 'Low (quarantine)', range: 'below 50', tone: 'bad' },
 ]
 const toneOf = (band: string) => BANDS.find((b) => b.band === band)?.tone ?? 'plain'
+export const BAND_TONE: Record<string, 'ok' | 'warn' | 'bad' | 'plain'> = { High: 'ok', Good: 'ok', Review: 'warn', Low: 'bad' }
 const barTone = (score: number | null) => (score === null ? undefined : score >= 75 ? 'good' : score >= 50 ? 'warn' : 'bad')
 const RULES: { key: keyof PersonDetail['records'][number]['parts']; label: string; how: string }[] = [
   { key: 'uniqueness', label: 'Uniqueness', how: '100 no duplicate · 50 waiting for review · 0 duplicate in the same system' },
@@ -34,7 +34,8 @@ export function TrustTab() {
   const [band, setBand] = useState('')
   const [q, setQ] = useState('')
   const [page, setPage] = useState(1)
-  const [open, setOpen] = useState<string | null>(null)
+  const navigate = useNavigate()
+  const open = (person: string) => navigate(`/customers/${encodeURIComponent(person)}`)
   const data = useApi(() => api.people(band, q.trim(), page), [band, q, page])
   const d = data.data
   const pages = d ? Math.max(1, Math.ceil(d.count / d.page_size)) : 1
@@ -99,10 +100,12 @@ export function TrustTab() {
             </thead>
             <tbody>
               {d.results.map((x) => (
-                <tr key={x.person} tabIndex={0} onClick={() => setOpen(x.person)} onKeyDown={(e) => e.key === 'Enter' && setOpen(x.person)}>
+                <tr key={x.person} tabIndex={0} onClick={() => open(x.person)} onKeyDown={(e) => e.key === 'Enter' && open(x.person)}>
                   <td>
                     <span className="cu-side">
-                      <b>{x.name || 'No name'}</b>
+                      <b>
+                        {x.name || 'No name'} {x.approved && <Pill tone="ok">Approved</Pill>}
+                      </b>
                       <small>{x.person}</small>
                     </span>
                   </td>
@@ -140,117 +143,55 @@ export function TrustTab() {
         </div>
         <Pager page={page} pages={pages} onPage={setPage} text={`${n(d.count)} people · lowest score first`} />
       </section>
-      {open && <PersonDialog id={open} onClose={() => setOpen(null)} />}
     </>
   )
 }
 
-// One person: their score, then each of their records with the five rules, the points and why.
-function PersonDialog({ id, onClose }: { id: string; onClose: () => void }) {
-  const data = useApi(() => api.person(id), [id])
-  const p = data.data
-  const [record, setRecord] = useState(0)
-  const r = p?.records[record]
-
+// The five rules of one record: score, its 20% share, and why.
+export function RulesTable({ record: r }: { record: PersonDetail['records'][number] }) {
   return (
-    <Dialog size="lg" title={p ? p.name || 'No name' : 'Person'} subtitle={p ? `${p.person} · found in ${p.records.length} record${p.records.length === 1 ? '' : 's'}` : undefined} onClose={onClose}>
-      {data.error && <ErrorAlert message={data.error} />}
-      {!p && !data.error && <Loader kind="scan" label="Loading" />}
-      {p && r && (
-        <>
-          <div className="tr-head">
-            <div className={`tr-big is-${toneOf(p.band)}`}>
-              <b>{p.score ?? '—'}</b>
-              <span>{p.band}</span>
-            </div>
-            <p className="dq-summary">
-              {p.records.length > 1 ? (
-                <Explain title="Person's score" text="The average of their records' scores." calc={`(${p.records.map((x) => x.trust).join(' + ')}) ÷ ${p.records.length} = ${p.score}`}>
-                  <b>Average of {p.records.length} records</b>
-                </Explain>
-              ) : (
-                <b>From one record</b>
-              )}
-              . Each record is scored on five rules worth 20% each.
-            </p>
-          </div>
-          {p.holds.length > 0 && <p className="dq-why is-bad">{p.holds.join('. ')}. This keeps the band at Review at best, whatever the score.</p>}
-          {p.records.length > 1 && (
-            <Seg
-              label="Record"
-              value={String(record)}
-              onChange={(v) => setRecord(Number(v))}
-              options={p.records.map((x, i) => ({ value: String(i), label: `${x.source} · ${x.trust ?? '—'}` }))}
-            />
-          )}
-          <div className="tr-record">
-            <span className="cu-side">
-              <b>{r.source}</b>
-              <small>
-                {r.key}
-                {r.updated_at ? ` · updated ${formatRelative(r.updated_at)}` : ''}
-              </small>
-            </span>
-            <Pill tone={toneOf(r.band)}>
-              {r.trust ?? '—'} · {r.band}
-            </Pill>
-          </div>
-          <div className="table-wrap">
-            <table className="lx-mini tr-rules">
-              <thead>
-                <tr>
-                  <th>Rule</th>
-                  <th className="num">Score</th>
-                  <th className="num">× 20%</th>
-                  <th>Why</th>
-                </tr>
-              </thead>
-              <tbody>
-                {RULES.map((rule) => {
-                  const part = r.parts[rule.key]
-                  return (
-                    <tr key={rule.key}>
-                      <td>
-                        <Explain title={rule.label} text={rule.how}>
-                          {rule.label}
-                        </Explain>
-                      </td>
-                      <td className="num">
-                        <b className={part.score >= 75 ? 'is-good-text' : part.score >= 50 ? undefined : 'is-bad-text'}>{part.score}</b>
-                      </td>
-                      <td className="num">{(part.score * 0.2).toFixed(1).replace(/\.0$/, '')}</td>
-                      <td className="text-sm">{part.why}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td colSpan={2}>
-                    <b>Trust score</b>
-                  </td>
-                  <td className="num">
-                    <b>{r.trust}</b>
-                  </td>
-                  <td className="muted text-sm">{RULES.map((rule) => (r.parts[rule.key].score * 0.2).toFixed(1).replace(/\.0$/, '')).join(' + ')}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-          {Object.keys(r.values).length > 1 && (
-            <div className="tr-values">
-              {Object.entries(r.values).map(([k, v]) => (
-                <span key={k}>
-                  <small>{LABEL[k] ?? k}</small>
-                  <code>{v}</code>
-                </span>
-              ))}
-            </div>
-          )}
-        </>
-      )}
-    </Dialog>
+    <div className="table-wrap">
+      <table className="lx-mini tr-rules">
+        <thead>
+          <tr>
+            <th>Rule</th>
+            <th className="num">Score</th>
+            <th className="num">× 20%</th>
+            <th>Why</th>
+          </tr>
+        </thead>
+        <tbody>
+          {RULES.map((rule) => {
+            const part = r.parts[rule.key]
+            return (
+              <tr key={rule.key}>
+                <td>
+                  <Explain title={rule.label} text={rule.how}>
+                    {rule.label}
+                  </Explain>
+                </td>
+                <td className="num">
+                  <b className={part.score >= 75 ? 'is-good-text' : part.score >= 50 ? undefined : 'is-bad-text'}>{part.score}</b>
+                </td>
+                <td className="num">{(part.score * 0.2).toFixed(1).replace(/\.0$/, '')}</td>
+                <td className="text-sm">{part.why}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colSpan={2}>
+              <b>Trust score</b>
+            </td>
+            <td className="num">
+              <b>{r.trust}</b>
+            </td>
+            <td className="muted text-sm">{RULES.map((rule) => (r.parts[rule.key].score * 0.2).toFixed(1).replace(/\.0$/, '')).join(' + ')}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
   )
 }
 
-const LABEL: Record<string, string> = { name: 'Name', dob: 'Date of birth', pan: 'PAN', aadhaar: 'Aadhaar', gender: 'Gender', mobile: 'Mobile', email: 'Email', address: 'Address', city: 'City', state: 'State', pincode: 'Pincode', cross_ref: 'ID in another system' }

@@ -97,14 +97,11 @@ export function CustomersPage() {
       />
       <div className="dq-tabs" role="tablist">
         <button type="button" role="tab" aria-selected={tab === 'trust'} className={tab === 'trust' ? 'is-on' : undefined} onClick={() => setParams({})}>
-          Trust scores
+          All customers
         </button>
         <button type="button" role="tab" aria-selected={tab === 'match'} className={tab === 'match' ? 'is-on' : undefined} onClick={() => setParams({ tab: 'match' })}>
           Match
           {s.review + s.conflicts > 0 && <span className="dq-count">{s.review + s.conflicts}</span>}
-        </button>
-        <button type="button" role="tab" aria-selected={false} disabled title="Comes next">
-          Golden records <Pill tone="plain">Next</Pill>
         </button>
       </div>
 

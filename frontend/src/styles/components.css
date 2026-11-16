@@ -8430,3 +8430,59 @@ td.num .count-button {
 .tr-values code {
   overflow-wrap: anywhere;
 }
+
+/* ================= Golden record ================= */
+.gd-head {
+  align-items: center;
+  justify-content: flex-start;
+  gap: 18px;
+}
+
+.gd-head .page-header-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.gd-rule {
+  display: block;
+  color: var(--text-3);
+  font-size: 11.5px;
+}
+
+.gd-value {
+  overflow-wrap: anywhere;
+}
+
+.gd-value.is-muted {
+  color: var(--text-3);
+}
+
+.gd-table tr.has-others td {
+  border-bottom: 0;
+}
+
+.gd-table tr.gd-other td {
+  padding-top: 4px;
+  padding-bottom: 8px;
+  background: var(--surface-2);
+}
+
+.gd-table tr.is-conflict td {
+  background: var(--bad-bg);
+}
+
+.gd-record {
+  flex-wrap: wrap;
+}
+
+.gd-score .dq-bar {
+  width: 80px;
+}
+
+.gd-head > .row {
+  margin-left: auto;
+}
+
+.gd-head .page-header-text {
+  max-width: none;
+}

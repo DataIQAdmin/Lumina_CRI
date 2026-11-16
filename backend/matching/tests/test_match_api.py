@@ -109,3 +109,34 @@ def test_every_person_gets_a_trust_score_from_the_five_rules(admin):
     assert app["parts"]["consistency"]["score"] == 100  # name, date of birth and PAN agree with core banking
     priya = next(x for x in everyone["results"] if any(s["key"] == "usr_b" for s in x["sources"]))
     assert priya["band"] in ("Review", "Low") and "A possible match is waiting for review" in priya["holds"]
+
+
+def test_golden_record_approve_and_keep_apart(admin):
+    admin.post("/api/match/run/")
+    rohan = Profile.objects.get(key="usr_a").person
+    got = admin.get(f"/api/people/{rohan}/").json()
+    fields = {g["field"]: g for g in got["golden"]}
+    assert fields["name"]["value"] == "Rohan Kumar" and fields["name"]["record"]["key"] == "AXC1"
+    assert fields["name"]["others"][0]["value"] == "Rohan K"
+    assert fields["mobile"]["record"]["key"] == "usr_a"  # the app was updated last
+    assert got["approval"] is None and got["can_decide"] is True
+
+    assert admin.post(f"/api/people/{rohan}/approve/").json() == {"approved": True}
+    assert admin.get(f"/api/people/{rohan}/").json()["approval"]["current"] is True
+    listed = admin.get("/api/people/", {"q": "AXC1"}).json()["results"][0]
+    assert listed["approved"] is True
+
+    app = Profile.objects.get(key="usr_a")
+    moved = admin.post(f"/api/people/{rohan}/keep-apart/", {"record": app.id}, format="json").json()
+    assert moved["links"] == 1 and moved["moved_to"] != Profile.objects.get(key="AXC1").person
+    assert admin.post("/api/match/run/").json()["rejected"] >= 1  # kept apart on the next run too
+    assert Profile.objects.get(key="usr_a").person != Profile.objects.get(key="AXC1").person
+
+
+def test_a_golden_record_with_a_conflict_cannot_be_approved(admin):
+    admin.post("/api/match/run/")
+    pair = MatchPair.objects.get(status="review")
+    admin.post(f"/api/match/pairs/{pair.id}/decide/", {"same": True}, format="json")
+    priya = Profile.objects.get(key="usr_b").person
+    assert any(g["conflict"] for g in admin.get(f"/api/people/{priya}/").json()["golden"])
+    assert admin.post(f"/api/people/{priya}/approve/").status_code == 400
