@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 
 import { Icon } from './Icon'
+import { useScrollLock } from './scrollLock'
 
 // A popup in the centre of the screen. Closes with its ✕, the Esc key or a click outside it. Drawn on the page body,
 // so no section around it (an animated one, say) can trap it in its own box.
@@ -21,6 +22,7 @@ export function Dialog({
   size?: 'sm' | 'md' | 'lg' | 'xl'
 }) {
   const box = useRef<HTMLElement>(null)
+  useScrollLock()
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', onKey)

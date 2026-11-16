@@ -8,6 +8,7 @@ import { useAuth } from '../auth/AuthContext'
 import { useOrganization } from '../organization'
 import { BrandMark } from './BrandMark'
 import { CommandPalette } from './CommandPalette'
+import { useScrollLock } from './scrollLock'
 import { Icon, type IconName } from './Icon'
 import { OrgLogo } from './OrgLogo'
 import { ProfileJobPanel } from './ProfileJobPanel'
@@ -59,6 +60,7 @@ export function Layout() {
   // Phones and small tablets: the menu is a drawer that slides in from the left.
   const [navOpen, setNavOpen] = useState(false)
   const [palette, setPalette] = useState(false)
+  useScrollLock(navOpen)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
