@@ -7,7 +7,7 @@ import { applyTheme, getTheme, type Theme } from '../theme'
 import { useAuth } from '../auth/AuthContext'
 import { useOrganization } from '../organization'
 import { BrandMark } from './BrandMark'
-import { FlowPill } from './FlowPill'
+import { CommandPalette } from './CommandPalette'
 import { Icon, type IconName } from './Icon'
 import { OrgLogo } from './OrgLogo'
 import { ProfileJobPanel } from './ProfileJobPanel'
@@ -15,58 +15,43 @@ import { Avatar } from './ui'
 
 type NavItem = { to: string; label: string; icon: IconName; end?: boolean; needs?: Capability[] }
 
-const GROUPS: { label: string; items: NavItem[] }[] = [
+// The menu: the four places people work in, then admin. Rules, the regex library and the silver layer sit under Data
+// quality until they become its tabs.
+const GROUPS: { label: string; items: (NavItem & { sub?: boolean })[] }[] = [
   {
-    label: 'Data',
+    label: '',
     items: [
-      { to: '/connectors', label: 'Connectors', icon: 'connectors' },
-      { to: '/profiling', label: 'Data profiling', icon: 'search' },
-      { to: '/rules', label: 'Rules', icon: 'sliders', needs: ['manage_sources'] },
-      { to: '/regex', label: 'Regex library', icon: 'key', needs: ['manage_sources'] },
-      { to: '/silver', label: 'Silver layer', icon: 'layers', needs: ['manage_sources'] },
-    ],
-  },
-  {
-    label: 'Being rebuilt',
-    items: [
+      { to: '/', label: 'Home', icon: 'overview', end: true },
+      { to: '/sources', label: 'Sources', icon: 'connectors' },
+      { to: '/profiling', label: 'Data quality', icon: 'shield' },
+      { to: '/rules', label: 'Rules', icon: 'sliders', needs: ['manage_sources'], sub: true },
+      { to: '/regex', label: 'Regex library', icon: 'key', needs: ['manage_sources'], sub: true },
+      { to: '/silver', label: 'Clean data', icon: 'layers', needs: ['manage_sources'], sub: true },
       { to: '/customers', label: 'Customers', icon: 'customers' },
-      { to: '/review', label: 'Match review', icon: 'merge' },
-      { to: '/approvals', label: 'Approvals', icon: 'approve' },
-      { to: '/compliance', label: 'Compliance', icon: 'shield' },
     ],
   },
   {
-    label: 'Governance',
-    items: [{ to: '/audit', label: 'Audit log', icon: 'audit', needs: ['view_audit'] }],
-  },
-  {
-    label: 'Administration',
+    label: 'Admin',
     items: [
-      { to: '/users', label: 'Users and roles', icon: 'customers', needs: ['manage_users'] },
       { to: '/settings', label: 'Settings', icon: 'sliders', needs: ['manage_settings'] },
+      { to: '/users', label: 'Users and roles', icon: 'customers', needs: ['manage_users'] },
+      { to: '/audit', label: 'Audit log', icon: 'audit', needs: ['view_audit'] },
     ],
-  },
-  {
-    label: 'Help',
-    items: [{ to: '/how-it-works', label: 'How it works', icon: 'info' }],
   },
 ]
 
 const PAGE_TITLES = [
+  { path: '/sources', title: 'Sources' },
+  { path: '/connectors', title: 'Sources' },
   { path: '/customers', title: 'Customers' },
-  { path: '/review', title: 'Match review' },
-  { path: '/connectors', title: 'Connectors' },
   { path: '/audit', title: 'Audit log' },
-  { path: '/approvals', title: 'Approvals' },
-  { path: '/how-it-works', title: 'How it works' },
   { path: '/users', title: 'Users and roles' },
   { path: '/settings', title: 'Settings' },
   { path: '/password', title: 'Change password' },
-  { path: '/compliance', title: 'Compliance' },
-  { path: '/profiling', title: 'Data profiling' },
+  { path: '/profiling', title: 'Data quality' },
   { path: '/rules', title: 'Rules' },
   { path: '/regex', title: 'Regex library' },
-  { path: '/silver', title: 'Silver layer' },
+  { path: '/silver', title: 'Clean data' },
 ]
 
 export function Layout() {
@@ -78,6 +63,17 @@ export function Layout() {
   const [theme, setTheme] = useState<Theme>(getTheme)
   // Phones and small tablets: the menu is a drawer that slides in from the left.
   const [navOpen, setNavOpen] = useState(false)
+  const [palette, setPalette] = useState(false)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setPalette(true)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
   const closeNav = () => setNavOpen(false)
 
   useEffect(() => {
@@ -111,12 +107,12 @@ export function Layout() {
     }
   }, [location.pathname, canSeeMatches, canApprove])
 
-  const page = PAGE_TITLES.find((p) => location.pathname.startsWith(p.path))
+  const page = location.pathname === '/' ? { title: 'Home' } : PAGE_TITLES.find((p) => location.pathname.startsWith(p.path))
 
   return (
     <div className="shell">
       <aside id="main-nav" className={`sidebar${navOpen ? ' open' : ''}`} aria-label="Main navigation">
-        <Link to="/" className="brand" title="Go to Overview" onClick={closeNav}>
+        <Link to="/" className="brand" title="Go to Home" onClick={closeNav}>
           <BrandMark />
           <div className="rail-text">
             <div className="brand-name">Lumina</div>
@@ -128,11 +124,13 @@ export function Layout() {
           .filter((group) => group.items.length > 0)
           .map((group) => (
           <nav key={group.label} className="nav-group" aria-label={group.label}>
-            <div className="nav-label">
-              <span className="rail-text">{group.label}</span>
-            </div>
+            {group.label && (
+              <div className="nav-label">
+                <span className="rail-text">{group.label}</span>
+              </div>
+            )}
             {group.items.map((item) => (
-              <NavLink key={item.to} to={item.to} end={item.end} className="nav-link" onClick={closeNav}>
+              <NavLink key={item.to} to={item.to} end={item.end} className={`nav-link${item.sub ? ' is-sub' : ''}`} onClick={closeNav}>
                 <Icon name={item.icon} />
                 <span className="rail-text">{item.label}</span>
                 {item.to === '/review' && pending ? <span className="nav-count">{pending}</span> : null}
@@ -180,7 +178,7 @@ export function Layout() {
           >
             <Icon name="menu" />
           </button>
-          <Link to="/" className="topbar-brand" title="Go to Overview">
+          <Link to="/" className="topbar-brand" title="Go to Home">
             <BrandMark size={28} />
             <span>{page?.title ?? 'Lumina'}</span>
           </Link>
@@ -192,7 +190,11 @@ export function Layout() {
             <strong>{page?.title ?? 'Workspace'}</strong>
           </div>
           <div className="topbar-right">
-            <FlowPill />
+            <button type="button" className="find" onClick={() => setPalette(true)} aria-label="Search (Ctrl K)">
+              <Icon name="search" size={15} />
+              <span className="find-text">Search pages and tables…</span>
+              <kbd>Ctrl K</kbd>
+            </button>
             {/* The organization's own logo: the one place its identity appears inside Lumina. */}
             <span className="org-badge" title={`Signed in to ${org.name}`}>
               <OrgLogo org={org} size={26} />
@@ -207,6 +209,7 @@ export function Layout() {
         </div>
       </main>
       <ProfileJobPanel />
+      {palette && <CommandPalette onClose={() => setPalette(false)} />}
     </div>
   )
 }

@@ -107,7 +107,7 @@ function ConnectionForm({ type, onBack }: { type: ConnectorType; onBack: () => v
             <Icon name="arrowLeft" size={16} /> Other types
           </button>
           <div className="row" style={{ gap: 8 }}>
-            <Link className="btn" to="/connectors">
+            <Link className="btn" to="/sources">
               Cancel
             </Link>
             <button type="submit" className="btn btn-primary" disabled={busy || name.trim().length < 2}>

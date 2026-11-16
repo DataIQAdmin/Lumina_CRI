@@ -17,7 +17,8 @@ import { RegexLibraryPage } from './pages/RegexLibraryPage'
 import { RulesPage } from './pages/RulesPage'
 import { SilverPage } from './pages/SilverPage'
 import { ConnectorSetupPage } from './pages/ConnectorSetupPage'
-import { ConnectorsPage } from './pages/ConnectorsPage'
+import { HomePage } from './pages/HomePage'
+import { SourcesPage } from './pages/SourcesPage'
 import { LoginPage } from './pages/LoginPage'
 import { NewConnectorPage } from './pages/NewConnectorPage'
 import { SettingsPage } from './pages/SettingsPage'
@@ -58,13 +59,14 @@ function Routed() {
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route index element={<Navigate to="/profiling" replace />} />
+        <Route index element={<HomePage />} />
+        <Route path="/sources" element={<SourcesPage />} />
         <Route path="/customers/*" element={<UnderBuildingPage title="Customers" />} />
         <Route path="/review" element={<UnderBuildingPage title="Match review" />} />
         <Route path="/approvals" element={<UnderBuildingPage title="Approvals" />} />
         <Route path="/compliance" element={<UnderBuildingPage title="Compliance" />} />
         {can('view_audit') && <Route path="/audit" element={<AuditPage />} />}
-        <Route path="/connectors" element={<ConnectorsPage />} />
+        <Route path="/connectors" element={<Navigate to="/sources" replace />} />
         <Route path="/profiling" element={<ProfilingPage />} />
         {can('manage_sources') && <Route path="/rules" element={<RulesPage />} />}
         {can('manage_sources') && <Route path="/regex" element={<RegexLibraryPage />} />}
