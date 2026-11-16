@@ -1,48 +1,65 @@
-"""Load the 11-table demo data (ingestion/raw_demo.py) into one of the demo source systems, replacing the old
-single-table demo data. Run it once per connector:
+"""Load the demo data (ingestion/bank_demo.py) into a bank's two systems, replacing what they held before:
 
-    python manage.py seed_raw_source postgres --bank axis --data "C:\\...\\Lumina Source Data\\Data"
-    python manage.py seed_raw_source mongodb  --bank axis --data "..."
-    python manage.py seed_raw_source mysql    --bank hdfc --data "..."
-    python manage.py seed_raw_source mongodb  --bank hdfc --data "..."
-    python manage.py seed_raw_source csv      --bank axis --data "..." --out "C:\\...\\axis-csv"
+    python manage.py seed_raw_source postgres --bank axis --data "C:\\...\\Lumina Source Data\\Data"   core banking
+    python manage.py seed_raw_source mongodb  --bank axis --data "..."                                   mobile app
+    python manage.py seed_raw_source mysql    --bank hdfc --data "..."                                   core banking
+    python manage.py seed_raw_source mongodb  --bank hdfc --data "..."                                   mobile app
+    python manage.py seed_raw_source csv      --bank axis --data "..." --out "C:\\...\\axis-csv"           core as CSV files
+
+Core banking gets the 11 related tables; the mobile app gets its own collections, built from the same customers.
+The mobile app run also writes answer_key_<bank>.json next to the data folder: which records are really the same
+person, to check Lumina's matching. It stays on this computer.
 
 Admin details are asked with hidden typing, so they never appear on screen, in the shell history or in a chat.
 The existing read-only login of each system keeps working (it is given read access to the new tables).
-Every value is stored as text, exactly as in the files: data profiling looks at the raw values.
+Core banking values are stored as text, as in the files: data profiling looks at the raw values.
 """
 
 import getpass
+import json
+from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 from django.core.management.base import BaseCommand, CommandError
 
-from ingestion.raw_demo import sample, write_csv_folder
+from ingestion.bank_demo import app_collections, core_tables
+from ingestion.raw_demo import TABLES, write_csv_folder
 
-# Each connector of a bank gets its own 30% of customers; the slot says which.
-SLOTS = {"postgres": 1, "mysql": 2, "mongodb": 3, "csv": 4}
+KINDS = ["postgres", "mysql", "mongodb", "csv"]
 # The old single-table demo data each system held, removed so the new tables replace it.
-OLD = {"postgres": ["core.customers", "core.accounts"], "mysql": ["customer_master", "loan_accounts"],
-       "mongodb": ["app_users"]}
+OLD = {"postgres": ["core.customers", "core.accounts"], "mysql": ["customer_master", "loan_accounts"]}
 
 
 class Command(BaseCommand):
-    help = "Load the 11-table demo data into a demo source system (replaces the old demo tables)."
+    help = "Load the demo data into a bank's core banking system or mobile app (replaces what they held)."
 
     def add_arguments(self, parser):
-        parser.add_argument("kind", choices=list(SLOTS))
+        parser.add_argument("kind", choices=KINDS)
         parser.add_argument("--bank", choices=["axis", "hdfc"], required=True)
         parser.add_argument("--data", required=True, help="Folder with the CSV files (Lumina Source Data\\Data).")
-        parser.add_argument("--customers", type=int, default=500)
+        parser.add_argument("--customers", type=int, default=100)
         parser.add_argument("--out", help="csv only: folder to write the 11 files to.")
 
     def handle(self, *args, kind, bank, data, customers, out=None, **options):
         try:
-            tables = sample(data, bank, SLOTS[kind], customers)
+            tables, people = core_tables(data, bank, customers)
         except (FileNotFoundError, ValueError) as exc:
             raise CommandError(str(exc)) from exc
+        if kind == "mongodb":
+            collections, key = app_collections(bank, people)
+            url = getpass.getpass("Paste the mongodb ADMIN connection string (hidden), then press Enter: ").strip()
+            if not url:
+                raise CommandError("No connection string given.")
+            self._mongodb_app(url, collections)
+            path = Path(data).resolve().parent / f"answer_key_{bank}.json"
+            path.write_text(json.dumps(key, indent=1), encoding="utf-8")
+            self.stdout.write(self.style.SUCCESS("Loaded:"))
+            for name, docs in collections.items():
+                self.stdout.write(f"  {name:<26} {len(docs):>6} documents")
+            self.stdout.write(f"Answer key written to {path} (kept on this computer only).")
+            return
         rows = sum(len(r) for _, r in tables.values())
-        self.stdout.write(f"Sample for {bank} {kind}: {customers} customers, {len(tables)} tables, {rows} rows.")
+        self.stdout.write(f"Core banking for {bank}: {customers} customers, {len(tables)} tables, {rows} rows.")
         if kind == "csv":
             if not out:
                 raise CommandError("Give --out, the folder to write the CSV files to.")
@@ -149,19 +166,17 @@ class Command(BaseCommand):
 
     # ---------- MongoDB (Atlas) ----------
 
-    def _mongodb(self, url, tables, bank):
+    def _mongodb_app(self, url, collections):
         import pymongo
 
         client = pymongo.MongoClient(url, serverSelectionTimeoutMS=10000)
         try:
             db = client["lumina_source"]
-            for old in OLD["mongodb"]:
+            # The earlier demo kept copies of the 11 core tables here; a mobile app does not hold those.
+            for old in [t[0] for t in TABLES] + list(collections):
                 db[old].drop()
-            for name, (header, rows) in tables.items():
-                db[name].drop()
-                docs = [{c: (r[i] if i < len(r) else "") for i, c in enumerate(header)} for r in rows]
-                for start in range(0, len(docs), 1000):
-                    db[name].insert_many(docs[start:start + 1000])
-                self.stdout.write(f"  {name}: {len(rows)} documents")
+            for name, docs in collections.items():
+                db[name].insert_many(docs)
+                self.stdout.write(f"  {name}: {len(docs)} documents")
         finally:
             client.close()

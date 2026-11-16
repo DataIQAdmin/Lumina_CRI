@@ -7,7 +7,7 @@ django-cors-headers==4.9.0
 django-tenants==4.0.0
 Django==5.2.18
 djangorestframework==3.18.2
-dnspython==2.9.0 ; python_version >= "3.11"
+dnspython==2.9.2 ; python_version >= "3.11"
 dnspython==2.8.0 ; python_version < "3.11"  # local development on Python 3.10 only; production and CI run 3.12
 gunicorn==26.2.0
 impyla==0.24.0
