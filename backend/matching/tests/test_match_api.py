@@ -94,3 +94,18 @@ def test_who_may_see_run_and_decide(admin):
     assert compliance.post(f"/api/match/pairs/{pk}/decide/", {"same": False}, format="json").status_code == 403
     steward = client("match.steward", group="Data steward")
     assert steward.post(f"/api/match/pairs/{pk}/decide/", {"same": False}, format="json").status_code == 200
+
+
+def test_every_person_gets_a_trust_score_from_the_five_rules(admin):
+    admin.post("/api/match/run/")
+    everyone = admin.get("/api/people/").json()
+    assert everyone["count"] == 5 and sum(everyone["bands"].values()) == 5
+    rohan = next(x for x in everyone["results"] if any(s["key"] == "usr_a" for s in x["sources"]))
+    assert len(rohan["sources"]) == 2
+    detail = admin.get(f"/api/people/{rohan['person']}/").json()
+    assert detail["score"] == round(sum(r["trust"] for r in detail["records"]) / 2)
+    app = next(r for r in detail["records"] if r["key"] == "usr_a")
+    assert set(app["parts"]) == {"uniqueness", "recency", "completeness", "consistency", "accuracy"}
+    assert app["parts"]["consistency"]["score"] == 100  # name, date of birth and PAN agree with core banking
+    priya = next(x for x in everyone["results"] if any(s["key"] == "usr_b" for s in x["sources"]))
+    assert priya["band"] in ("Review", "Low") and "A possible match is waiting for review" in priya["holds"]

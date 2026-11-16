@@ -2,6 +2,8 @@
 
 import type {
   MappingChoice,
+  PeoplePage,
+  PersonDetail,
   MatchPairRow,
   MatchSummary,
   RuleExamples,
@@ -265,6 +267,9 @@ export const api = {
     get<{ column_names: string[]; page: number; page_size: number; count: number; results: unknown[][] }>(
       `/raw/${code}/rows/?${new URLSearchParams({ table, page: String(page) })}`,
     ),
+  people: (band: string, q: string, page: number) =>
+    get<PeoplePage>(`/people/?${new URLSearchParams({ band, q, page: String(page) })}`),
+  person: (id: string) => get<PersonDetail>(`/people/${encodeURIComponent(id)}/`),
   match: () => get<MatchSummary>('/match/'),
   matchRun: () => post<MatchSummary['summary']>('/match/run/'),
   matchPairs: (show: string, q: string, page: number) =>

@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type { MatchPairRow, MatchPoint } from '../api/types'
 import { useApi } from '../api/useApi'
 import { useCan } from '../auth/AuthContext'
+import { TrustTab } from '../components/customers/TrustTab'
 import { Dialog } from '../components/Dialog'
 import { Bar, Head, Pager } from '../components/dq/kit'
 import { Explain } from '../components/Explain'
@@ -40,6 +41,8 @@ export function CustomersPage() {
   const [q, setQ] = useState('')
   const [page, setPage] = useState(1)
   const [open, setOpen] = useState<number | null>(null)
+  const [params, setParams] = useSearchParams()
+  const tab = params.get('tab') === 'match' ? 'match' : 'trust'
   const [running, setRunning] = useState(false)
   const [version, setVersion] = useState(0)
   const pairs = useApi(() => (canSee ? api.matchPairs(show, q.trim(), page) : Promise.resolve(null)), [canSee, show, q, page, version])
@@ -83,7 +86,7 @@ export function CustomersPage() {
     <>
       <Head
         title="Customers"
-        text="Find the same person across every source. Sure matches are linked; a person decides the rest."
+        text="One person per real customer, found across every source, each with a trust score you can trace."
         actions={
           d.can_run && (
             <button type="button" className="btn btn-primary" disabled={running} onClick={run}>
@@ -93,7 +96,10 @@ export function CustomersPage() {
         }
       />
       <div className="dq-tabs" role="tablist">
-        <button type="button" role="tab" aria-selected className="is-on">
+        <button type="button" role="tab" aria-selected={tab === 'trust'} className={tab === 'trust' ? 'is-on' : undefined} onClick={() => setParams({})}>
+          Trust scores
+        </button>
+        <button type="button" role="tab" aria-selected={tab === 'match'} className={tab === 'match' ? 'is-on' : undefined} onClick={() => setParams({ tab: 'match' })}>
           Match
           {s.review + s.conflicts > 0 && <span className="dq-count">{s.review + s.conflicts}</span>}
         </button>
@@ -108,6 +114,8 @@ export function CustomersPage() {
             Matching uses each source's clean rows and its mapped fields. Finish a source in <Link to="/profiling">Data quality</Link>, then run matching.
           </EmptyState>
         </section>
+      ) : tab === 'trust' ? (
+        <TrustTab key={version} />
       ) : (
         <>
           <div className="hm-stats">
