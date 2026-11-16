@@ -14,7 +14,7 @@ from .connectors.catalog import DEMO_TYPES
 
 def _models():
     from compliance.models import ConsentRecord, KycRecord
-    from ingestion.models import ColumnRule, RawRecord, RawTable, SourceRecord
+    from ingestion.models import ColumnRule, FieldMap, RawRecord, RawTable, SourceRecord
     from interactions.models import Interaction
     from mdm.models import Customer, CustomerLink, FieldCorrection, GoldenField, MatchSuggestion
     from products.models import Holding
@@ -22,7 +22,7 @@ def _models():
 
     # In delete order: each one before what it points to.
     return [GoldenField, FieldCorrection, Interaction, MatchSuggestion, CustomerLink, Customer, Holding, KycRecord,
-            ConsentRecord, SourceRecord, RawRecord, ColumnRule, RawTable, SyncRun, UploadedFile]
+            ConsentRecord, SourceRecord, RawRecord, ColumnRule, FieldMap, RawTable, SyncRun, UploadedFile]
 
 
 @dataclass

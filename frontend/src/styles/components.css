@@ -7788,3 +7788,99 @@ td.num .count-button {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ================= Map fields ================= */
+.mp-group {
+  background: var(--surface-2);
+}
+
+.mp-group h2 {
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.mp-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.1fr) minmax(180px, 1fr) minmax(0, 1.2fr);
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+}
+
+.mp-group + .mp-row {
+  border-top: 0;
+}
+
+.mp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mp-field b {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.mp-field small {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.mp-select {
+  width: 100%;
+}
+
+.mp-samples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mp-chip {
+  max-width: 100%;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mp-cover {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 18px;
+}
+
+.mp-cover-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.mp-cover-row .hm-ic {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+.mp-cover-row .text-sm {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .mp-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+}
