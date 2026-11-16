@@ -23,6 +23,8 @@ urlpatterns = [
     path("raw/<slug:code>/proof/", raw_views.proof),
     path("raw/<slug:code>/profile/", raw_views.profile),
     path("mapping/<slug:code>/", mapping_views.mapping),
+    path("people/", match_views.people),
+    path("people/<str:person>/", match_views.person),
     path("match/", match_views.summary),
     path("match/run/", match_views.run),
     path("match/pairs/", match_views.pairs),

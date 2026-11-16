@@ -10,12 +10,13 @@ from django.db import transaction
 from django.utils import timezone
 
 from ingestion.models import FieldMap, RawTable
-from ingestion.rules import clean_rows
+from ingestion.rules import judged_rows
 from sources.models import Source
 
 from . import normalize
 from .models import MatchPair, MatchRun, Profile
 from .score import candidate_pairs, score, status_of
+from .trust import score_all
 
 LINKS = ("customer_id", "updated_at")
 DECIDED = (MatchPair.CONFIRMED, MatchPair.REJECTED)
@@ -30,36 +31,52 @@ def _mapping(source):
 
 
 def build_profiles(source):
-    """{customer id: {"values", "keys", "tables", "updated_at"}} of one source, from the clean rows of each mapped
-    table. When a customer has several clean rows in a table (two phone numbers), the newest one counts."""
-    profiles = defaultdict(lambda: {"values": {}, "keys": {}, "tables": {}, "updated_at": None})
+    """{customer id: profile} of one source. Every customer with a row in a mapped table gets a profile (all rows
+    are scored); its values come only from clean rows. When a customer has several clean rows in a table (two phone
+    numbers), the newest one counts. rows: how many of the customer's rows there are and how many are clean;
+    held: fields that have a value only in held-back rows."""
+    profiles = defaultdict(lambda: {"values": {}, "keys": {}, "tables": {}, "updated_at": None,
+                                    "rows": {"total": 0, "clean": 0}, "held": set()})
     for name, fields in _mapping(source).items():
         table = RawTable.objects.filter(source=source, name=name).first()
         if table is None or fields.get("customer_id") not in (table.columns or []):
             continue
         at = {f: table.columns.index(c) for f, c in fields.items() if c in table.columns}
-        best = {}
-        for position, plain, shown in clean_rows(table):
+        best, held = {}, defaultdict(set)
+        for position, plain, shown, passed in judged_rows(table):
             key = normalize.text(plain[at["customer_id"]])
             if not key:
                 continue
+            p = profiles[key]
+            p["rows"]["total"] += 1
             when = normalize.moment(plain[at["updated_at"]]) if "updated_at" in at else None
+            if when and (p["updated_at"] is None or _later(when, p["updated_at"])):
+                p["updated_at"] = when
+            if not passed:
+                held[key] |= {f for f, i in at.items() if f not in LINKS and normalize.text(plain[i])}
+                continue
+            p["rows"]["clean"] += 1
             kept = best.get(key)
             if kept is None or (when and (kept[0] is None or _later(when, kept[0]))):
                 best[key] = (when, plain, shown)
         for key, (when, plain, shown) in best.items():
             p = profiles[key]
             for field, i in at.items():
-                if field in LINKS:
+                if field in LINKS or not normalize.text(shown[i]):
                     continue
                 p["values"][field] = normalize.text(shown[i])
                 p["tables"][field] = table.name
                 clean = normalize.NORMALIZERS.get(field)
                 if clean:
                     p["keys"][field] = clean(plain[i])
-            if when and (p["updated_at"] is None or _later(when, p["updated_at"])):
-                p["updated_at"] = when
-    return dict(profiles)
+        for key, fields_held in held.items():
+            profiles[key]["held"] |= fields_held
+    out = {}
+    for key, p in profiles.items():
+        p["held"] = sorted(f for f in p["held"] if f not in p["values"])
+        p["keys"] = {k: v for k, v in p["keys"].items() if v}
+        out[key] = p
+    return out
 
 
 def _later(x, y):
@@ -85,7 +102,7 @@ def run(user=""):
         for key, built in build_profiles(source).items():
             Profile.objects.update_or_create(source=source, key=key, defaults={
                 "values": built["values"], "keys": built["keys"], "tables": built["tables"],
-                "updated_at": _aware(built["updated_at"])})
+                "updated_at": _aware(built["updated_at"]), "rows": built["rows"], "held": built["held"]})
             seen.add((source.id, key))
     for p in Profile.objects.all():
         if (p.source_id, p.key) not in seen:
@@ -104,6 +121,7 @@ def run(user=""):
                                   decided_by=decision[1] if decision else "", decided_at=decision[2] if decision else None))
     MatchPair.objects.bulk_create(made)
     regroup()
+    score_all()
     summary = summarize()
     MatchRun.objects.create(ran_by=user, summary=summary)
     return summary
@@ -153,5 +171,6 @@ def decide(pair, same, user=""):
     pair.decided_at = timezone.now()
     pair.save(update_fields=["status", "decided_by", "decided_at"])
     regroup()
+    score_all()
     pair.a.refresh_from_db(fields=["person"])
     pair.b.refresh_from_db(fields=["person"])

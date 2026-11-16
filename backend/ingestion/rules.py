@@ -168,3 +168,12 @@ def clean_rows(table):
     clock = Clock()
     return [(position, plain, shown) for position, plain, shown in rows_of(table)
             if all(clock.matches(compiled, text_of(plain[i])) for i, compiled in rules)]
+
+
+def judged_rows(table):
+    """[(position, readable values, values for the screen, passed)] of every row: passed is True when the row
+    passes every rule of its table. With no rule, no row passes (silver forms only from rules)."""
+    rules = [(table.columns.index(c), compile_rule(p)) for c, p in table_rules(table).items()]
+    clock = Clock()
+    return [(position, plain, shown, bool(rules) and all(clock.matches(compiled, text_of(plain[i])) for i, compiled in rules))
+            for position, plain, shown in rows_of(table)]

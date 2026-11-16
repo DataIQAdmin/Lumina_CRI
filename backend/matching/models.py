@@ -18,6 +18,14 @@ class Profile(models.Model):
     tables = models.JSONField(default=dict)
     updated_at = models.DateTimeField(null=True, blank=True)  # newest "Last updated" of its rows
     person = models.CharField(max_length=20, blank=True, db_index=True)  # the group it belongs to, e.g. "P-12"
+    rows = models.JSONField(default=dict)  # {"total": 3, "clean": 2}: the customer's rows in mapped tables
+    held = models.JSONField(default=list)  # fields with a value only in held-back rows, e.g. ["pan"]
+    # Trust score (matching/trust.py): 0-100 from the five rules, its band, each rule's score and why, and what
+    # keeps the band at Review whatever the score.
+    trust = models.PositiveSmallIntegerField(null=True, blank=True)
+    band = models.CharField(max_length=10, blank=True)
+    parts = models.JSONField(default=dict)
+    holds = models.JSONField(default=list)
     built_at = models.DateTimeField(auto_now=True)
 
     class Meta:

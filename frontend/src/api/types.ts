@@ -765,3 +765,44 @@ export interface MatchPairRow {
   decided_at: string | null
   points?: MatchPoint[]
 }
+
+// Trust scores (backend matching/trust.py): five rules at 20% each, per record and per person.
+export type TrustBand = 'High' | 'Good' | 'Review' | 'Low'
+
+export interface PersonRow {
+  person: string
+  name: string
+  score: number | null
+  band: TrustBand | ''
+  holds: string[]
+  sources: { source: string; key: string; score: number | null; band: TrustBand | '' }[]
+}
+
+export interface PeoplePage {
+  bands: Record<TrustBand, number>
+  count: number
+  page: number
+  page_size: number
+  average: number | null
+  results: PersonRow[]
+}
+
+export interface TrustPart {
+  score: number
+  why: string
+}
+
+export interface PersonDetail extends PersonRow {
+  records: {
+    id: number
+    source: string
+    key: string
+    trust: number | null
+    band: TrustBand | ''
+    parts: Record<'uniqueness' | 'recency' | 'completeness' | 'consistency' | 'accuracy', TrustPart>
+    holds: string[]
+    rows: { total?: number; clean?: number }
+    updated_at: string | null
+    values: Record<string, string>
+  }[]
+}

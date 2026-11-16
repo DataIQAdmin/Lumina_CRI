@@ -8307,3 +8307,126 @@ td.num .count-button {
   max-height: calc(100vh - 24px);
   overflow-y: auto;
 }
+
+/* ================= Customers: trust scores ================= */
+.tr-band {
+  border-left: 4px solid var(--border-strong);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tr-band.is-ok {
+  border-left-color: var(--good-dot);
+}
+
+.tr-band.is-warn {
+  border-left-color: var(--warn-dot);
+}
+
+.tr-band.is-bad {
+  border-left-color: var(--bad-dot);
+}
+
+.tr-band.is-on {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.tr-band small {
+  margin-left: 4px;
+  font-size: 11.5px;
+}
+
+.tr-clear {
+  margin-left: 10px;
+}
+
+.tr-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tr-chip {
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.tr-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.tr-big {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: var(--surface-2);
+}
+
+.tr-big b {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.tr-big span {
+  font-size: 12px;
+  margin-top: -14px;
+}
+
+.tr-big.is-ok {
+  background: var(--good-bg);
+  color: var(--good-text);
+}
+
+.tr-big.is-warn {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.tr-big.is-bad {
+  background: var(--bad-bg);
+  color: var(--bad-text);
+}
+
+.tr-record {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tr-rules tfoot td {
+  border-top: 2px solid var(--border-strong);
+}
+
+.tr-values {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.tr-values span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tr-values small {
+  color: var(--text-3);
+  font-size: 11.5px;
+}
+
+.tr-values code {
+  overflow-wrap: anywhere;
+}

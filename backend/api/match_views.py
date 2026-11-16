@@ -12,8 +12,9 @@ from accounts.roles import can
 from audit.models import AuditEvent
 from audit.services import record
 from matching import service
-from matching.models import MatchPair, MatchRun
+from matching.models import MatchPair, MatchRun, Profile
 from matching.score import AUTO, POINTS, REVIEW
+from matching.trust import person_score
 
 from .permissions import HasRole, requires
 
@@ -107,3 +108,55 @@ def decide(request, pk):
     record(request, AuditEvent.MERGE if same else AuditEvent.KEEP_APART, target=f"match {found.id}",
            a=str(found.a), b=str(found.b), score=found.score)
     return Response(_pair(found, full=True))
+
+
+# ---------------- trust scores of people ----------------
+
+def _people():
+    """{person: [profiles]} with their sources."""
+    out = {}
+    for p in Profile.objects.select_related("source").order_by("person", "-trust"):
+        out.setdefault(p.person, []).append(p)
+    return out
+
+
+def _person(person, profiles, pii):
+    score, band, holds = person_score(profiles)
+    named = next((p.values.get("name") for p in profiles if p.values.get("name")), "")
+    return {"person": person, "name": named, "score": score, "band": band, "holds": holds,
+            "sources": [{"source": p.source.name, "key": p.key, "score": p.trust, "band": p.band} for p in profiles]}
+
+
+@api_view(["GET"])
+@permission_classes([HasRole])
+def people(request):
+    """GET /api/people/?band=High|Good|Review|Low&q=&page=1  Every person with their trust score, lowest first."""
+    everyone = [_person(k, v, True) for k, v in _people().items()]
+    bands = {b: sum(1 for x in everyone if x["band"] == b) for b in ("High", "Good", "Review", "Low")}
+    band = request.query_params.get("band", "")
+    q = request.query_params.get("q", "").strip().lower()
+    shown = [x for x in everyone if (not band or x["band"] == band)
+             and (not q or q in x["name"].lower() or any(q in s["key"].lower() for s in x["sources"]))]
+    shown.sort(key=lambda x: (x["score"] if x["score"] is not None else -1, x["name"]))
+    try:
+        page = max(int(request.query_params.get("page", 1)), 1)
+    except ValueError:
+        page = 1
+    return Response({"bands": bands, "count": len(shown), "page": page, "page_size": PAGE,
+                     "average": round(sum(x["score"] or 0 for x in everyone) / len(everyone)) if everyone else None,
+                     "results": shown[(page - 1) * PAGE: page * PAGE]})
+
+
+@api_view(["GET"])
+@permission_classes([HasRole])
+def person(request, person):
+    """GET /api/people/<person>/  One person: their score, and each of their records with the five rules."""
+    found = list(Profile.objects.select_related("source").filter(person=person).order_by("-trust"))
+    if not found:
+        return Response({"detail": "No such person."}, status=status.HTTP_404_NOT_FOUND)
+    pii = can(request.user, "view_pii")
+    out = _person(person, found, pii)
+    out["records"] = [{"id": p.id, "source": p.source.name, "key": p.key, "trust": p.trust, "band": p.band,
+                       "parts": p.parts, "holds": p.holds, "rows": p.rows, "updated_at": p.updated_at,
+                       "values": p.values if pii else {"name": p.values.get("name", "")}} for p in found]
+    return Response(out)
