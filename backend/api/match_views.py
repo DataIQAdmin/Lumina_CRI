@@ -13,8 +13,9 @@ from audit.models import AuditEvent
 from audit.services import record
 from matching import service
 from matching import golden
+from matching.settings import SettingsError, current, clean as clean_settings, GOLDEN_FIELDS, GOLDEN_LABELS, RULES
 from matching.models import GoldenApproval, MatchPair, MatchRun, Profile
-from matching.score import AUTO, POINTS, REVIEW
+from matching.score import LABELS as MATCH_LABELS
 from matching.trust import person_score
 
 from .permissions import HasRole, requires
@@ -44,8 +45,10 @@ def _pair(p, full=False):
 def summary(request):
     """GET /api/match/  What the last matching run found, and the scoring rules."""
     last = MatchRun.objects.first()
+    settings = current()
     return Response({"summary": service.summarize(), "ran_at": last.ran_at if last else None,
-                     "ran_by": last.ran_by if last else "", "points": POINTS, "auto": AUTO, "review": REVIEW,
+                     "ran_by": last.ran_by if last else "", "points": settings["points"], "auto": settings["auto"],
+                     "review": settings["review"],
                      "can_run": can(request.user, "manage_sources"), "can_decide": can(request.user, "decide_matches")})
 
 
@@ -121,8 +124,8 @@ def _people():
     return out
 
 
-def _person(person, profiles, pii):
-    score, band, holds = person_score(profiles)
+def _person(person, profiles, pii, bands=None):
+    score, band, holds = person_score(profiles, bands)
     named = next((p.values.get("name") for p in profiles if p.values.get("name")), "")
     return {"person": person, "name": named, "score": score, "band": band, "holds": holds,
             "sources": [{"source": p.source.name, "key": p.key, "score": p.trust, "band": p.band} for p in profiles]}
@@ -133,11 +136,12 @@ def _person(person, profiles, pii):
 def people(request):
     """GET /api/people/?band=High|Good|Review|Low&q=&page=1  Every person with their trust score, lowest first."""
     groups = _people()
-    everyone = [_person(k, v, True) for k, v in groups.items()]
+    settings = current()
+    everyone = [_person(k, v, True, settings["bands"]) for k, v in groups.items()]
     approvals = {a.person: a for a in GoldenApproval.objects.filter(person__in=groups)}
     for x in everyone:
         a = approvals.get(x["person"])
-        x["approved"] = bool(a) and a.fingerprint == golden.fingerprint(golden.build(groups[x["person"]]))
+        x["approved"] = bool(a) and a.fingerprint == golden.fingerprint(golden.build(groups[x["person"]], settings))
     bands = {b: sum(1 for x in everyone if x["band"] == b) for b in ("High", "Good", "Review", "Low")}
     band = request.query_params.get("band", "")
     q = request.query_params.get("q", "").strip().lower()
@@ -148,7 +152,7 @@ def people(request):
         page = max(int(request.query_params.get("page", 1)), 1)
     except ValueError:
         page = 1
-    return Response({"bands": bands, "count": len(shown), "page": page, "page_size": PAGE,
+    return Response({"bands": bands, "count": len(shown), "weights": settings["weights"], "limits": settings["bands"], "page": page, "page_size": PAGE,
                      "average": round(sum(x["score"] or 0 for x in everyone) / len(everyone)) if everyone else None,
                      "results": shown[(page - 1) * PAGE: page * PAGE]})
 
@@ -177,9 +181,11 @@ def person(request, person):
     if not found:
         return Response({"detail": "No such person."}, status=status.HTTP_404_NOT_FOUND)
     pii = can(request.user, "view_pii")
-    rows = golden.build(found)
+    settings = current()
+    rows = golden.build(found, settings)
     approval = GoldenApproval.objects.filter(person=person).first()
-    out = _person(person, found, pii)
+    out = _person(person, found, pii, settings["bands"])
+    out["weights"] = settings["weights"]
     out["records"] = [_record(p, pii) for p in found]
     out["golden"] = _golden_json(rows, pii)
     out["approval"] = {"by": approval.approved_by, "at": approval.approved_at,
@@ -195,7 +201,7 @@ def approve(request, person):
     found = list(Profile.objects.select_related("source").filter(person=person))
     if not found:
         return Response({"detail": "No such person."}, status=status.HTTP_404_NOT_FOUND)
-    rows = golden.build(found)
+    rows = golden.build(found, current())
     if any(x["conflict"] for x in rows):
         return Response({"detail": "Some identity details differ between sources. Settle them first: keep a record "
                                    "apart, or fix the value at its source."}, status=status.HTTP_400_BAD_REQUEST)
@@ -219,3 +225,36 @@ def keep_apart(request, person):
     record(request, AuditEvent.KEEP_APART, target=f"golden {person}", record=str(found), links=count)
     stays = Profile.objects.filter(id__in=others).values_list("person", flat=True).first()
     return Response({"moved_to": found.person, "stays": stays, "links": count})
+
+
+@api_view(["GET", "PUT"])
+@permission_classes([HasRole])
+def settings_view(request):
+    """GET /api/settings/matching/  Matching, trust score and golden record settings, with the defaults.
+    PUT  the same shape: checked, saved, and matching runs again so everything follows them."""
+    from matching.models import MatchSettings
+    from matching.settings import DEFAULTS
+    from sources.models import Source
+
+    if request.method == "PUT":
+        if not can(request.user, "manage_settings"):
+            return Response({"detail": "Only administrators change these settings."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            values = clean_settings(request.data)
+        except SettingsError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        MatchSettings.objects.update_or_create(pk=1, defaults={"values": values, "updated_by": request.user.username})
+        record(request, AuditEvent.SETTINGS_CHANGED, target="matching settings", **values)
+        summary = service.run(request.user.username)
+        return Response({"settings": values, "summary": summary})
+    saved = MatchSettings.objects.filter(pk=1).first()
+    settings = current()
+    order = settings["source_order"]
+    sources = sorted(Source.objects.filter(enabled=True), key=lambda x: (order.index(x.code) if x.code in order else len(order),
+                                                                         -float(x.trust), x.name))
+    return Response({"settings": settings, "defaults": DEFAULTS, "rules": RULES,
+                     "sources": [{"code": x.code, "name": x.name} for x in sources],
+                     "golden_fields": [{"key": f, "label": GOLDEN_LABELS[f]} for f in GOLDEN_FIELDS],
+                     "match_fields": [{"key": f, "label": MATCH_LABELS[f]} for f in DEFAULTS["points"]],
+                     "updated_by": saved.updated_by if saved else "", "updated_at": saved.updated_at if saved else None,
+                     "can_edit": can(request.user, "manage_settings")})

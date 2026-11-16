@@ -8486,3 +8486,85 @@ td.num .count-button {
 .gd-head .page-header-text {
   max-width: none;
 }
+
+/* ================= Settings: matching, trust, golden ================= */
+.st-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
+.st-note {
+  margin: 0;
+  padding: 12px 18px 0;
+}
+
+.st-order {
+  margin: 0;
+  padding: 10px 12px 12px;
+  list-style: none;
+}
+
+.st-order li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.st-order li:last-child {
+  border-bottom: 0;
+}
+
+.st-order i {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.st-rows {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 18px 14px;
+}
+
+.st-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.st-num {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.st-num .input {
+  width: 76px;
+  text-align: right;
+}
+
+.st-sub {
+  padding: 14px 0 4px;
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}

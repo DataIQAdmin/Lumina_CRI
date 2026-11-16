@@ -54,6 +54,7 @@ urlpatterns = [
     path("auth/me/", views.me),
     path("auth/change-password/", admin_views.change_password),
     path("settings/trust/", admin_views.trust_settings),
+    path("settings/matching/", match_views.settings_view),
     path("settings/logo/", admin_views.organization_logo),
     path("connectors/catalog/", connector_views.catalog),
     path("connectors/", connector_views.create_connector),

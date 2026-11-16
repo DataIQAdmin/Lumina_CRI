@@ -80,3 +80,11 @@ class GoldenApproval(models.Model):
     fingerprint = models.TextField()
     approved_by = models.CharField(max_length=150)
     approved_at = models.DateTimeField(auto_now=True)
+
+
+class MatchSettings(models.Model):
+    """The one row of this organization's matching, trust and golden record settings (matching/settings.py)."""
+
+    values = models.JSONField(default=dict)
+    updated_by = models.CharField(max_length=150, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
