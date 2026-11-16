@@ -97,3 +97,39 @@ def test_postgres_load_replaces_the_old_demo_tables(folder, pg_url, monkeypatch,
         assert conn.execute('SELECT "Note" FROM core.customer_master LIMIT 1').fetchone()[0] is None  # empty stays empty
         conn.execute("DROP SCHEMA core CASCADE")
     assert "customer_master" in out.getvalue()
+
+
+def test_core_banking_uses_cif_numbers_everywhere(folder):
+    from ingestion.bank_demo import core_tables
+
+    tables, people = core_tables(folder, "axis", 10)
+    cifs = {p["cif"] for p in people}
+    assert len(cifs) == 10 and all(c.startswith("AXC") for c in cifs)
+    for name in ["customer_address", "customer_email", "customer_phone"]:
+        assert {r[1] for r in tables[name][1]} == cifs  # linked tables point at the same CIF numbers
+    header, rows = tables["customer_master"]
+    stamp = header.index("LastUpdatedTimestamp")
+    assert all(r[stamp][:4] in {"2023", "2024", "2025"} for r in rows)  # core banking was updated long ago
+
+
+def test_mobile_app_overlaps_core_banking_like_a_real_bank(folder, monkeypatch):
+    from ingestion import bank_demo
+
+    # The tiny test files hold 50 customers per bank, so the app shares 20 of 30 instead of 70 of 100.
+    monkeypatch.setattr(bank_demo, "SHARED", 20)
+    monkeypatch.setattr(bank_demo, "APP_ONLY", 7)
+    SHARED, APP_ONLY, DUPLICATES = 20, 7, bank_demo.DUPLICATES
+    _, people = bank_demo.core_tables(folder, "hdfc", 30)
+    collections, key = bank_demo.app_collections("hdfc", people)
+    app_collections = bank_demo.app_collections
+    users = collections["app_users"]
+    assert len(users) == SHARED + APP_ONLY + DUPLICATES
+    assert all(u["userId"].startswith("usr_") and "profile" in u for u in users)  # its own IDs and nested shape
+    linked = sum("cifRef" in u for u in users)
+    assert 10 < linked < SHARED  # most shared customers carry their CIF number, some must be matched another way
+    assert sum(1 for k in key if k["core"]) == SHARED and sum(1 for k in key if not k["core"]) == APP_ONLY
+    assert sum(1 for k in key if len(k["app"]) == 2) == DUPLICATES
+    assert sorted(k["conflict"] for k in key if k["conflict"]) == ["dob", "pan"]
+    assert {len(d) for d in [collections["app_addresses"], collections["app_devices"]]} == {len(users)}
+    again, _ = app_collections("hdfc", people)
+    assert again == collections  # the same data every time
