@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 
 import { profileJob, type ProfileJob, type TableState } from '../profileJob'
 import { Icon } from './Icon'
+import { useScrollLock } from './scrollLock'
 
 const STATE_TEXT: Record<TableState, string> = {
   waiting: 'Waiting',
@@ -35,6 +36,7 @@ export function ProfileJobPanel() {
   const navigate = useNavigate()
   const elapsed = useElapsed(job)
   const primary = useRef<HTMLButtonElement>(null)
+  useScrollLock(job?.view === 'popup')
 
   useEffect(() => {
     if (job?.view !== 'popup') return

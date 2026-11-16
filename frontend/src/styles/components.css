@@ -8201,3 +8201,29 @@ td.num .count-button {
   max-width: 100%;
   min-width: 0;
 }
+
+/* Scrolling inside a popup or menu stops at its edge instead of carrying on to the page behind. */
+.dlg-scrim,
+.dlg-b,
+.palette-list,
+.job-overlay,
+.job-dialog,
+.job-dialog *,
+.sidebar,
+.xp-card {
+  overscroll-behavior: contain;
+}
+
+/* The popup's middle part scrolls; what is inside it keeps its full height instead of being squeezed and cut off. */
+.dlg {
+  overflow: hidden;
+}
+
+.dlg-b {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.dlg-b > * {
+  flex-shrink: 0;
+}

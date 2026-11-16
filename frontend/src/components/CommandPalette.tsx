@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 
 import { api } from '../api/client'
 import { Icon } from './Icon'
+import { useScrollLock } from './scrollLock'
 
 type Item = { label: string; hint: string; to: string }
 
@@ -18,6 +19,7 @@ const PAGES: Item[] = [
 // Ctrl+K: jump to any page or profiled table by typing its name.
 export function CommandPalette({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate()
+  useScrollLock()
   const [q, setQ] = useState('')
   const [tables, setTables] = useState<Item[]>([])
   const [at, setAt] = useState(0)
