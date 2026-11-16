@@ -223,12 +223,12 @@ function GoldenRow({ g }: { g: PersonDetail['golden'][number] }) {
   return (
     <>
       <tr className={`${g.conflict ? 'is-conflict' : ''}${g.others.length ? ' has-others' : ''}`}>
-        <td>
+        <td className="is-main">
           <b>{g.label}</b>
           <small className="gd-rule">{g.rule}</small>
         </td>
-        <td>{g.value ? <code className="gd-value">{g.value}</code> : <span className="muted">Missing</span>}</td>
-        <td>
+        <td data-label="Value">{g.value ? <code className="gd-value">{g.value}</code> : <span className="muted">Missing</span>}</td>
+        <td data-label="From">
           {g.record ? (
             <span className="cu-side">
               <b>{g.record.source}</b>
@@ -238,24 +238,24 @@ function GoldenRow({ g }: { g: PersonDetail['golden'][number] }) {
             <span className="muted">—</span>
           )}
         </td>
-        <td className="text-sm">
+        <td data-label="Why" className="text-sm">
           {g.conflict && <Pill tone="bad">Needs a person</Pill>} {g.why}
         </td>
       </tr>
       {g.others.map((o) => (
         <tr key={`${g.field}:${o.record.id}`} className={`gd-other${o.same ? ' is-same' : ''}${!o.same && g.conflict ? ' is-conflict' : ''}`}>
           <td className="muted text-sm">↳ also</td>
-          <td>
+          <td data-label="Also">
             <code className="gd-value is-muted">{o.value}</code>
           </td>
-          <td>
+          <td data-label="From">
             <span className="cu-side">
               <small>
                 {o.record.source} · {o.record.key}
               </small>
             </span>
           </td>
-          <td className="muted text-sm">{o.why}</td>
+          <td data-label="Why" className="muted text-sm">{o.why}</td>
         </tr>
       ))}
     </>

@@ -101,7 +101,7 @@ export function TrustTab() {
             <tbody>
               {d.results.map((x) => (
                 <tr key={x.person} tabIndex={0} onClick={() => open(x.person)} onKeyDown={(e) => e.key === 'Enter' && open(x.person)}>
-                  <td>
+                  <td className="is-main">
                     <span className="cu-side">
                       <b>
                         {x.name || 'No name'} {x.approved && <Pill tone="ok">Approved</Pill>}
@@ -109,14 +109,14 @@ export function TrustTab() {
                       <small>{x.person}</small>
                     </span>
                   </td>
-                  <td>
+                  <td data-label="Trust score">
                     <span className="dq-filled">
                       <Bar value={x.score ?? 0} tone={barTone(x.score)} />
                       <b className="num">{x.score ?? '—'}</b>
                       <Pill tone={toneOf(x.band)}>{x.band}</Pill>
                     </span>
                   </td>
-                  <td>
+                  <td data-label="Found in">
                     <span className="tr-chips">
                       {x.sources.map((s) => (
                         <span key={`${s.source}:${s.key}`} className="tr-chip" title={`${s.source} · ${s.key}`}>
@@ -125,7 +125,7 @@ export function TrustTab() {
                       ))}
                     </span>
                   </td>
-                  <td>{x.holds.length ? <span className="is-bad-text text-sm">{x.holds.join('; ')}</span> : <span className="muted text-sm">—</span>}</td>
+                  <td data-label="Holds it back">{x.holds.length ? <span className="is-bad-text text-sm">{x.holds.join('; ')}</span> : <span className="muted text-sm">—</span>}</td>
                   <td className="dq-go">
                     <Icon name="chevron-right" size={16} />
                   </td>
@@ -168,17 +168,17 @@ export function RulesTable({ record: r, weights }: { record: PersonDetail['recor
             const part = r.parts[rule.key]
             return (
               <tr key={rule.key}>
-                <td>
+                <td className="is-main">
                   <Explain title={rule.label} text={rule.how}>
                     {rule.label}
                   </Explain>
                 </td>
-                <td className="num">
+                <td className="num" data-label="Score">
                   <b className={part.score >= 75 ? 'is-good-text' : part.score >= 50 ? undefined : 'is-bad-text'}>{part.score}</b>
                 </td>
-                <td className="num muted">{w(rule.key)}%</td>
-                <td className="num">{share(rule.key)}</td>
-                <td className="text-sm">{part.why}</td>
+                <td className="num muted" data-label="Weight">{w(rule.key)}%</td>
+                <td className="num" data-label="Points">{share(rule.key)}</td>
+                <td className="text-sm tr-why">{part.why}</td>
               </tr>
             )
           })}

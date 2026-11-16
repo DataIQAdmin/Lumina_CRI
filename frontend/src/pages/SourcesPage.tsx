@@ -73,7 +73,7 @@ export function SourcesPage() {
                   const p = profiled(s.code)
                   return (
                     <tr key={s.code} tabIndex={0} onClick={() => setOpen(s)} onKeyDown={(e) => e.key === 'Enter' && setOpen(s)}>
-                      <td>
+                      <td className="is-main">
                         <span className="sx-src">
                           <ConnectorLogo type={s.connector_type} size={34} />
                           <span>
@@ -82,8 +82,8 @@ export function SourcesPage() {
                           </span>
                         </span>
                       </td>
-                      <td className="num">{p ? n(p.tables) : '—'}</td>
-                      <td className="muted">{p?.read_at ? formatRelative(p.read_at) : 'Never'}</td>
+                      <td data-label="Tables checked" className="num">{p ? n(p.tables) : '—'}</td>
+                      <td data-label="Last checked" className="muted">{p?.read_at ? formatRelative(p.read_at) : 'Never'}</td>
                       <td>
                         <span className={`lx-pill is-${s.enabled ? 'ok' : 'warn'}`}>{s.enabled ? 'Connected' : 'Switched off'}</span>
                       </td>

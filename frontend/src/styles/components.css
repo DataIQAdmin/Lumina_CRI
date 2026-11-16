@@ -8568,3 +8568,553 @@ td.num .count-button {
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
+
+/* ================= Phones and tablets: every screen neat at any width ================= */
+
+/* Tablets and small laptops: the step bar keeps one row, numbers only where words do not fit. */
+@media (max-width: 1100px) {
+  .dq-flow.is-five {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .dq-flow.is-five button {
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 6px;
+    text-align: center;
+  }
+
+  .dq-flow.is-five span {
+    align-items: center;
+  }
+
+  .dq-flow.is-five small {
+    display: none;
+  }
+
+  .dq-flow.is-five b {
+    font-size: 12.5px;
+    line-height: 1.25;
+  }
+}
+
+@media (max-width: 900px) {
+  .dq-flow:not(.is-five) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .dq-flow:not(.is-five) button {
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 6px;
+    border-right: 1px solid var(--border);
+    border-bottom: 0;
+    text-align: center;
+  }
+
+  .dq-flow:not(.is-five) span {
+    align-items: center;
+  }
+
+  .dq-flow:not(.is-five) small {
+    display: none;
+  }
+
+  .dq-flow.is-five button {
+    border-right: 1px solid var(--border);
+    border-bottom: 0;
+  }
+
+  .dq-flow.is-five button:last-child,
+  .dq-flow:not(.is-five) button:last-child {
+    border-right: 0;
+  }
+
+  /* The table list in Check & fix becomes a row of chips that scrolls sideways. */
+  .dq-worklist .hm-h {
+    padding: 10px 14px;
+  }
+
+  .dq-worklist ol {
+    display: flex;
+    gap: 6px;
+    padding: 8px 10px 10px;
+    overflow-x: auto;
+  }
+
+  .dq-worklist li {
+    flex: 0 0 auto;
+  }
+
+  .dq-worklist li button {
+    width: auto;
+    max-width: 240px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+  }
+
+  .dq-worklist li button.is-on {
+    border-color: var(--accent);
+  }
+
+  .gd-head {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 640px) {
+  .dq-flow.is-five b {
+    font-size: 11px;
+  }
+
+  .dq-flow.is-five i,
+  .dq-flow i {
+    width: 24px;
+    height: 24px;
+  }
+
+  .dq-flow.is-five .is-now b {
+    color: var(--accent-text);
+  }
+
+  /* Number cards: two to a row. */
+  .hm-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .hm-stat {
+    padding: 12px 14px;
+  }
+
+  .hm-stat > b {
+    font-size: 22px;
+  }
+
+  .cu-rule {
+    font-size: 15px !important;
+  }
+
+  /* Tables become one card per row: the main cell first, the rest under it with a small label. */
+  .sx-table thead,
+  .gd-table thead {
+    display: none;
+  }
+
+  .sx-table,
+  .sx-table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .sx-table tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 14px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sx-table tbody td {
+    display: block;
+    padding: 0;
+    border: 0;
+    background: none !important;
+  }
+
+  .sx-table tbody td.is-main {
+    flex: 1 1 60%;
+    min-width: 0;
+  }
+
+  .sx-table tbody td.is-main + td.is-main {
+    flex-basis: 100%;
+  }
+
+  .sx-table tbody td.dq-go {
+    display: none;
+  }
+
+  .sx-table tbody td.sx-empty {
+    flex: 1 1 100%;
+    text-align: center;
+  }
+
+  .sx-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 2px;
+    color: var(--text-3);
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .sx-table tbody tr:hover td {
+    background: none;
+  }
+
+  .sx-table .dq-filled .dq-bar {
+    width: 72px;
+  }
+
+  /* The golden record: each field a small block, the values not chosen tucked under it. */
+  .gd-table tbody tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 14px;
+    padding: 12px 16px;
+  }
+
+  .gd-table tbody td.is-main {
+    grid-column: 1 / -1;
+  }
+
+  .gd-table tbody td[data-label='Why'] {
+    grid-column: 1 / -1;
+  }
+
+  .gd-table tr.gd-other {
+    padding-top: 8px;
+    background: var(--surface-2);
+  }
+
+  .gd-table tr.gd-other td:first-child {
+    display: none;
+  }
+
+  .gd-table tr.has-others {
+    border-bottom: 0;
+  }
+
+  .gd-rule {
+    display: inline;
+    margin-left: 6px;
+  }
+
+  /* Side-by-side tables inside popups: one block per field. */
+  .cu-compare thead,
+  .tr-rules thead {
+    display: none;
+  }
+
+  .cu-compare,
+  .cu-compare tbody,
+  .cu-compare tfoot {
+    display: block;
+  }
+
+  .cu-compare tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .cu-compare td {
+    padding: 0;
+    border: 0;
+  }
+
+  .cu-compare td.is-main {
+    grid-column: 1 / -1;
+    font-weight: 600;
+  }
+
+  .cu-compare td[data-label]::before,
+  .tr-rules td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--text-3);
+    font-size: 11px;
+  }
+
+  .cu-compare tfoot tr {
+    grid-template-columns: 1fr auto;
+  }
+
+  .cu-compare tfoot td {
+    border-top: 0;
+  }
+
+  .dq-tablehead h2 {
+    font-size: 19px;
+  }
+
+  .page-header h1 {
+    font-size: 24px;
+  }
+
+  .tr-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .tr-big,
+  .gd-head .tr-big {
+    width: 68px;
+    height: 68px;
+  }
+
+  .tr-big b {
+    font-size: 22px;
+  }
+
+  .dlg-h,
+  .dlg-b,
+  .dlg-f {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .dlg-f {
+    flex-wrap: wrap;
+  }
+
+  .dlg-f .btn {
+    flex: 1 1 auto;
+  }
+
+  .dlg-scrim {
+    padding: 8px;
+  }
+
+  .dlg {
+    max-height: calc(100dvh - 16px);
+    border-radius: 14px;
+  }
+}
+
+@media (max-width: 640px) {
+  .tr-rules,
+  .tr-rules tbody,
+  .tr-rules tfoot {
+    display: block;
+  }
+
+  .tr-rules tr {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tr-rules td {
+    padding: 0;
+    border: 0;
+    text-align: left !important;
+  }
+
+  .tr-rules td.is-main,
+  .tr-rules td.tr-why {
+    grid-column: 1 / -1;
+  }
+
+  .tr-rules td.is-main {
+    font-weight: 600;
+  }
+
+  .tr-rules tfoot tr {
+    grid-template-columns: 1fr auto;
+  }
+
+  .tr-rules tfoot td:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Home and number cards: 4 across on laptops, 2 on tablets, never one left alone on a row. */
+.hm-steps,
+.hm-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.hm-step {
+  border-right: 1px solid var(--border);
+}
+
+.hm-step:nth-child(4n) {
+  border-right: 0;
+}
+
+@media (max-width: 1100px) {
+  .hm-steps,
+  .hm-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hm-step {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .hm-step:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .hm-step:nth-last-child(-n + 2) {
+    border-bottom: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .hm-steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hm-step,
+  .hm-step:nth-child(2n) {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+  }
+
+  .hm-step:last-child {
+    border-bottom: 0;
+  }
+
+  .hm-step p {
+    margin-bottom: 4px;
+  }
+}
+
+@media (min-width: 1101px) {
+  .hm-stats:has(> :nth-child(3):last-child) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .hm-stats:has(> :nth-child(2):last-child) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1100px) {
+  .hm-stats > :nth-child(3):last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Touch screens and narrow windows: everything a finger presses is at least 36px tall. */
+@media (max-width: 900px), (pointer: coarse) {
+  .lx-seg button {
+    min-height: 36px;
+    padding: 7px 12px;
+  }
+
+  .lx-search {
+    height: 42px;
+  }
+
+  .lx-search input {
+    height: 100%;
+    font-size: 16px; /* 16px stops phones zooming in when typing */
+  }
+
+  .xp-btn {
+    display: inline-block;
+    padding: 6px 0;
+    margin: -6px 0;
+  }
+
+  .btn-sm {
+    min-height: 36px;
+  }
+
+  .link.text-sm {
+    display: inline-block;
+    padding: 6px 0;
+  }
+
+  .input,
+  .select {
+    min-height: 40px;
+    font-size: 16px;
+  }
+
+  .sx-checks label,
+  .st-order li {
+    min-height: 44px;
+  }
+}
+
+/* Segmented controls never run off a narrow screen: they scroll sideways inside themselves. */
+@media (max-width: 640px) {
+  .lx-seg {
+    display: flex;
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .lx-seg button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .hm-h {
+    gap: 10px;
+  }
+
+  .hm-h > .lx-search,
+  .hm-h > .lx-seg {
+    flex: 1 1 100%;
+  }
+}
+
+@media (max-width: 900px), (pointer: coarse) {
+  .dq-trail button,
+  .dq-trail a {
+    display: inline-block;
+    padding: 8px 0;
+  }
+
+  .dq-trail {
+    margin-bottom: -16px;
+  }
+
+  input[type='checkbox'],
+  input[type='radio'] {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+@media (max-width: 900px), (pointer: coarse) {
+  .xp-btn {
+    border-bottom: 0;
+    text-decoration: underline dashed var(--text-3);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
+  }
+}
+
+/* Names wrap only between words, never in the middle of one. */
+.dq-name {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+@media (max-width: 1100px) {
+  .sx-table .dq-filled .dq-bar {
+    width: 64px;
+  }
+
+  .sx-table th,
+  .sx-table td {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}
+
+/* Rows popup on phones: the pager wraps neatly under the table. */
+@media (max-width: 640px) {
+  .sx-foot {
+    align-items: center;
+  }
+
+  .sx-foot .lx-pages {
+    width: 100%;
+    justify-content: space-between;
+  }
+}

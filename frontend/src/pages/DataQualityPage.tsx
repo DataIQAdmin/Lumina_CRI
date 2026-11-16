@@ -319,11 +319,11 @@ function TablesStep({ source, chosen, canRead, onContinue }: { source: RawSource
                         {at >= 0 ? at + 1 : ''}
                       </span>
                     </td>
-                    <td>
+                    <td className="is-main">
                       <b className="dq-name">{t}</b>
                     </td>
-                    <td className="num muted">{d ? n(d.rows) : '—'}</td>
-                    <td>
+                    <td data-label="Rows" className="num muted">{d ? n(d.rows) : '—'}</td>
+                    <td data-label="Filled">
                       {d ? (
                         <span className="dq-filled">
                           <Bar value={d.filled ?? 100} tone={(d.filled ?? 100) >= 95 ? 'good' : 'warn'} />
@@ -334,7 +334,7 @@ function TablesStep({ source, chosen, canRead, onContinue }: { source: RawSource
                       )}
                     </td>
                     <td>{d ? d.to_check ? <Pill tone="warn">{d.to_check} column{d.to_check === 1 ? '' : 's'}</Pill> : <Pill tone="ok">All fine</Pill> : '—'}</td>
-                    <td className="num muted">{d?.mapped ? n(d.mapped) : '—'}</td>
+                    <td data-label="Fields mapped" className="num muted">{d?.mapped ? n(d.mapped) : '—'}</td>
                   </tr>
                 )
               })}
