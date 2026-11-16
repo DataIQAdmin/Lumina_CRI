@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { api } from '../api/client'
-import type { RegexLibrary, RulePreview } from '../api/types'
+import type { ColumnCounts, RegexLibrary, RulePreview } from '../api/types'
 import { Dialog } from './Dialog'
+import { Examples } from './dq/Examples'
+import { partsOf } from './dq/kit'
 import { Icon } from './Icon'
-import { n, Pill } from './Lx'
+import { n, Pill, Split } from './Lx'
 import { LibrarySelect, OfferCard, type Offer, PreviewResult, RegexVerdict, useRegexCheck } from './regex'
 import { useToast } from './Toasts'
 import { ErrorAlert } from './ui'
@@ -26,6 +28,8 @@ export function RuleDialog({
   column: fixed,
   start = '',
   library,
+  counts,
+  rows,
   onClose,
   onDone,
 }: {
@@ -36,6 +40,8 @@ export function RuleDialog({
   column?: string
   start?: string
   library: RegexLibrary | null
+  counts: ColumnCounts[]
+  rows: number
   onClose: () => void
   onDone: () => void
 }) {
@@ -52,12 +58,15 @@ export function RuleDialog({
   const [preview, setPreview] = useState<RulePreview | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [seeing, setSeeing] = useState(false)
+  const profile = counts.find((c) => c.name === column)
 
   const pickColumn = (name: string) => {
     setColumn(name)
     setPattern(columns.find((c) => c.name === name)?.pattern ?? '')
     setOffers([])
     setOfferError(null)
+    setSeeing(false)
   }
   const ask = async () => {
     setAsking(true)
@@ -149,6 +158,13 @@ export function RuleDialog({
         <p className="rd-lead">
           Pick a rule for <b>{column}</b>. The whole value must match it.
         </p>
+        <div className="dq-see">
+          <button type="button" className="btn btn-sm" onClick={() => setSeeing(!seeing)}>
+            <Icon name="search" size={14} /> {seeing ? 'Hide records' : 'See 10 records'}
+          </button>
+          <span className="muted text-sm">5 good and 5 wrong values to copy.</span>
+        </div>
+        {seeing && <Examples code={code} table={table} column={column} pattern={check?.valid ? pattern : ''} />}
         <div className="lx-ask">
           <label className="lx-search is-wide">
             <Icon name="search" size={15} />
@@ -240,6 +256,7 @@ export function RuleDialog({
 
   return (
     <Dialog title={current?.pattern ? 'Change a format rule' : 'Add a format rule'} subtitle={`${table} · ${source}`} onClose={onClose} footer={footer}>
+      {step > 1 && <ColumnStrip table={table} column={column} profile={profile} rows={rows} />}
       <ol className="rd-steps" aria-label="Steps">
         {steps.map((s, i) => (
           <li key={s} className={i + 1 === step ? 'is-now' : i + 1 < step ? 'is-done' : undefined} aria-current={i + 1 === step ? 'step' : undefined}>
@@ -250,5 +267,28 @@ export function RuleDialog({
       </ol>
       {body}
     </Dialog>
+  )
+}
+
+// Which table and column the rule is for, with what is inside it, so it is clear the right one was picked.
+function ColumnStrip({ table, column, profile, rows }: { table: string; column: string; profile?: ColumnCounts; rows: number }) {
+  const parts = profile ? partsOf(profile) : []
+  return (
+    <div className="rd-strip">
+      <span className="rd-place">
+        <span className="muted">{table}</span>
+        <Icon name="chevron-right" size={13} />
+        <b>{column}</b>
+      </span>
+      {profile && (
+        <>
+          <span className="muted text-sm">
+            {n(profile.filled)} of {n(rows)} filled{profile.empty ? ` · ${n(profile.empty)} empty` : ''}
+            {parts.length ? ` · ${parts.slice(0, 3).map((p) => `${p.label} ${n(p.count)}`).join(' · ')}` : ''}
+          </span>
+          {parts.length > 0 && <Split parts={parts} />}
+        </>
+      )}
+    </div>
   )
 }

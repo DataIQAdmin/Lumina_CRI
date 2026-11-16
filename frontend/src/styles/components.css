@@ -7884,3 +7884,283 @@ td.num .count-button {
     gap: 8px;
   }
 }
+
+/* ================= Data quality: five steps, work list, rule helpers ================= */
+.dq-flow.is-five {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.dq-flow.is-five button {
+  padding: 12px 14px;
+}
+
+.dq-work {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.dq-worklist {
+  position: sticky;
+  top: 76px;
+}
+
+.dq-worklist ol {
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+}
+
+.dq-worklist li button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dq-worklist li button:hover {
+  background: var(--surface-2);
+}
+
+.dq-worklist li button.is-on {
+  background: var(--accent-soft);
+}
+
+.dq-worklist i {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--text-3);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.dq-worklist .is-on i {
+  background: var(--accent);
+  color: #fff;
+}
+
+.dq-worklist small {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.dq-workmain {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.dq-tablehead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.dq-tablehead h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.dq-section .hm-h h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow-wrap: anywhere;
+}
+
+.dq-num {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+}
+
+.dq-pad {
+  padding: 14px 18px 0;
+}
+
+.dq-tools {
+  border-bottom: 0;
+}
+
+.dq-sub {
+  padding: 10px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-3);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.dq-result {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+}
+
+.dq-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.dq-reasons.is-inline {
+  padding: 0;
+}
+
+.dq-order {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dq-order.is-on {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.sx-table tbody tr.is-ticked td {
+  background: var(--accent-soft);
+}
+
+.sx-table tbody tr[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.dq-note {
+  margin: 0;
+  padding-bottom: 12px;
+}
+
+.dq-see {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.dq-examples {
+  padding: 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 12px;
+}
+
+.dq-more {
+  align-self: center;
+}
+
+.dq-copy {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dq-copy-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dq-copy .btn-icon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+}
+
+.rd-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.rd-place {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+
+.rd-place b {
+  font-weight: 600;
+}
+
+.mp-group-h {
+  padding: 8px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.mp-group-h + .mp-row {
+  border-top: 0;
+}
+
+.mp-join {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+@media (max-width: 1100px) {
+  .dq-flow.is-five {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .dq-work {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dq-worklist {
+    position: static;
+  }
+}
+
+@media (max-width: 900px) {
+  .dq-flow.is-five {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

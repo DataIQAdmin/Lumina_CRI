@@ -25,6 +25,7 @@ urlpatterns = [
     path("mapping/<slug:code>/", mapping_views.mapping),
     path("rules/<slug:code>/", rule_views.rules),
     path("rules/<slug:code>/preview/", rule_views.preview),
+    path("rules/<slug:code>/examples/", rule_views.examples),
     path("rules/<slug:code>/suggest/", rule_views.suggest),
     path("rules/<slug:code>/remove/", rule_views.remove),
     path("regex/check/", rule_views.check),
