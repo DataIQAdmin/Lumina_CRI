@@ -8164,3 +8164,40 @@ td.num .count-button {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Popups: an extra-wide one for rows, and long values that wrap instead of stretching the popup. */
+.dlg.is-xl {
+  width: min(1200px, 100%);
+}
+
+.dlg-b {
+  min-width: 0;
+}
+
+.dlg .table-wrap {
+  max-width: 100%;
+  overflow: auto;
+}
+
+.dlg .lx-example,
+.dlg .lx-code,
+.dlg .dq-v code,
+.dlg .regex-input {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.dlg .lx-examples > div {
+  min-width: 0;
+}
+
+/* Keep the popup's column no wider than the screen, whatever a wide table inside it would like. */
+.dlg-scrim {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+}
+
+.dlg {
+  max-width: 100%;
+  min-width: 0;
+}
