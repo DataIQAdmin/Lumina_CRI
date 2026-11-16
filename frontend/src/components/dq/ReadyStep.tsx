@@ -131,7 +131,7 @@ export function ReadyStep({ code, source, list, canManage, canViewRows, onOpen, 
           ← Back to Map fields
         </button>
         <Link to="/customers" className="btn btn-primary">
-          Go to Customers →
+          Go to Match →
         </Link>
       </div>
     </>

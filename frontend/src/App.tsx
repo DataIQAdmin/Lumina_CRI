@@ -12,6 +12,7 @@ import { WakingBanner } from './components/WakingBanner'
 import { ORG_BASE } from './organization'
 import { AuditPage } from './pages/AuditPage'
 import { ChangePasswordPage } from './pages/ChangePasswordPage'
+import { CustomersPage } from './pages/CustomersPage'
 import { DataQualityPage } from './pages/DataQualityPage'
 import { RegexLibraryPage } from './pages/RegexLibraryPage'
 import { ConnectorSetupPage } from './pages/ConnectorSetupPage'
@@ -67,7 +68,7 @@ function Routed() {
       <Route element={<Layout />}>
         <Route index element={<HomePage />} />
         <Route path="/sources" element={<SourcesPage />} />
-        <Route path="/customers/*" element={<UnderBuildingPage title="Customers" />} />
+        <Route path="/customers/*" element={<CustomersPage />} />
         <Route path="/review" element={<UnderBuildingPage title="Match review" />} />
         <Route path="/approvals" element={<UnderBuildingPage title="Approvals" />} />
         <Route path="/compliance" element={<UnderBuildingPage title="Compliance" />} />
