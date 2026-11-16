@@ -8227,3 +8227,22 @@ td.num .count-button {
 .dlg-b > * {
   flex-shrink: 0;
 }
+
+.dq-readyrow {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dq-readyrow:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.dq-readyrow:disabled {
+  cursor: default;
+}

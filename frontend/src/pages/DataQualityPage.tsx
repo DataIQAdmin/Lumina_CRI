@@ -170,7 +170,7 @@ export function DataQualityPage() {
         {trail}
         <Head title="Ready" text={`What ${src.name} gives to customer records.`} />
         {flow}
-        <ReadyStep code={src.code} source={src.name} list={list} canManage={canManage} onOpen={(t) => go('work', { table: t })} onMap={() => go('map')} />
+        <ReadyStep code={src.code} source={src.name} list={list} canManage={canManage} canViewRows={raw.data.can_view_rows} onOpen={(t) => go('work', { table: t })} onMap={() => go('map')} />
       </>
     )
   }
