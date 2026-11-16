@@ -17,6 +17,7 @@ from sources.models import Source
 from . import normalize
 from .models import MatchPair, MatchRun, Profile
 from .score import candidate_pairs, score, status_of
+from .settings import current
 from .trust import score_all
 
 LINKS = ("customer_id", "updated_at")
@@ -112,11 +113,12 @@ def run(user=""):
     profiles = {p.id: p for p in Profile.objects.select_related("source")}
     flat = {pid: {"key": p.key, "keys": p.keys, "values": p.values} for pid, p in profiles.items()}
     made = []
+    settings = current()
     for x, y in candidate_pairs(flat):
-        total, points, conflicts = score(flat[x], flat[y])
+        total, points, conflicts = score(flat[x], flat[y], settings["points"])
         a, b = profiles[x], profiles[y]
         decision = kept.get((a.source_id, a.key, b.source_id, b.key)) or kept.get((b.source_id, b.key, a.source_id, a.key))
-        status = decision[0] if decision else status_of(total, conflicts)
+        status = decision[0] if decision else status_of(total, conflicts, settings["auto"], settings["review"])
         if status:
             made.append(MatchPair(a=a, b=b, score=total, points=points, conflicts=conflicts, status=status,
                                   decided_by=decision[1] if decision else "", decided_at=decision[2] if decision else None))

@@ -140,3 +140,48 @@ def test_a_golden_record_with_a_conflict_cannot_be_approved(admin):
     priya = Profile.objects.get(key="usr_b").person
     assert any(g["conflict"] for g in admin.get(f"/api/people/{priya}/").json()["golden"])
     assert admin.post(f"/api/people/{priya}/approve/").status_code == 400
+
+
+def settings_body(admin, **change):
+    body = admin.get("/api/settings/matching/").json()["settings"]
+    for key, value in change.items():
+        if isinstance(value, dict):
+            body[key] = {**body[key], **value}
+        else:
+            body[key] = value
+    return body
+
+
+def test_settings_change_scores_and_golden_records(admin):
+    admin.post("/api/match/run/")
+    got = admin.get("/api/settings/matching/").json()
+    assert got["settings"]["weights"] == {r: 20 for r in got["rules"]} and got["can_edit"] is True
+    app = next(s["code"] for s in got["sources"] if s["name"] == "Mobile app")
+
+    # The mobile app first in source order: the golden name now comes from the app.
+    put = admin.put("/api/settings/matching/", settings_body(admin, source_order=[app]), format="json")
+    assert put.status_code == 200, put.json()
+    rohan = Profile.objects.get(key="usr_a").person
+    name = next(g for g in admin.get(f"/api/people/{rohan}/").json()["golden"] if g["field"] == "name")
+    assert name["value"] == "Rohan K" and name["why"] == "Mobile app comes first in source order"
+
+    # No points for PAN or the CIF reference: Rohan's score falls below 80, so a person decides.
+    admin.put("/api/settings/matching/", settings_body(admin, points={"pan": 0, "cross_ref": 0}), format="json")
+    assert MatchPair.objects.get(a__key__in=["AXC1", "usr_a"], b__key__in=["AXC1", "usr_a"]).status == "review"
+
+    # All the weight on recency: a record updated this month scores 100, one from 2024 scores 20.
+    admin.put("/api/settings/matching/", settings_body(admin, weights={"uniqueness": 0, "recency": 100, "completeness": 0,
+                                                                       "consistency": 0, "accuracy": 0}), format="json")
+    assert Profile.objects.get(key="AXC3").trust == 20
+
+
+def test_bad_settings_are_refused(admin):
+    put = lambda **change: admin.put("/api/settings/matching/", settings_body(admin, **change), format="json")  # noqa: E731
+    assert "add up to 100" in put(weights={"recency": 30}).json()["detail"]
+    assert "go down" in put(bands={"good": 95}).json()["detail"]
+    assert "below the match score" in put(review=90).json()["detail"]
+    assert put(source_order=["nope"]).status_code == 400
+    assert put(field_rules={"name": "random"}).status_code == 400
+    steward = client("set.steward", group="Data steward")
+    assert steward.get("/api/settings/matching/").json()["can_edit"] is False
+    assert steward.put("/api/settings/matching/", settings_body(admin), format="json").status_code == 403

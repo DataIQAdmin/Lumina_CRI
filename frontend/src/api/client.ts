@@ -2,6 +2,8 @@
 
 import type {
   MappingChoice,
+  MatchSettingsInfo,
+  MatchSettingsValues,
   PeoplePage,
   PersonDetail,
   MatchPairRow,
@@ -273,6 +275,9 @@ export const api = {
   approveGolden: (id: string) => post<{ approved: boolean }>(`/people/${encodeURIComponent(id)}/approve/`),
   keepApart: (id: string, record: number) =>
     post<{ moved_to: string; stays: string; links: number }>(`/people/${encodeURIComponent(id)}/keep-apart/`, { record }),
+  matchSettings: () => get<MatchSettingsInfo>('/settings/matching/'),
+  saveMatchSettings: (values: MatchSettingsValues) =>
+    put<{ settings: MatchSettingsValues; summary: MatchSummary['summary'] }>('/settings/matching/', values),
   match: () => get<MatchSummary>('/match/'),
   matchRun: () => post<MatchSummary['summary']>('/match/run/'),
   matchPairs: (show: string, q: string, page: number) =>

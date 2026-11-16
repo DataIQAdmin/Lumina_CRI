@@ -150,7 +150,7 @@ export function GoldenPage() {
           <span className="muted text-sm">
             <Explain
               title="Person's trust score"
-              text="The average of their records' scores. Each record is scored on five rules worth 20% each."
+              text="The average of their records' scores. Each record is scored on five rules, weighted as set on Settings."
               calc={`(${p.records.map((r) => r.trust).join(' + ')}) ÷ ${p.records.length} = ${p.score}`}
             >
               Score {p.score} is the average
@@ -188,7 +188,7 @@ export function GoldenPage() {
       {trust !== null && (
         <Dialog size="lg" title={`${p.records[trust].source} · ${p.records[trust].key}`} subtitle={`Trust score ${p.records[trust].trust} · ${p.records[trust].band}`} onClose={() => setTrust(null)}>
           {p.records[trust].holds.length > 0 && <p className="dq-why is-bad">{p.records[trust].holds.join('. ')}. This keeps the band at Review at best.</p>}
-          <RulesTable record={p.records[trust]} />
+          <RulesTable record={p.records[trust]} weights={p.weights} />
         </Dialog>
       )}
       {apart && (

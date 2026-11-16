@@ -23,7 +23,8 @@ FIELDS = [
 ]
 ADDRESS = ["address", "city", "state", "pincode"]
 CRITICAL = {"pan", "aadhaar", "dob"}
-RULE_TEXT = {"order": "Source order", "recent": "Most recent", "address": "Most recent address"}
+RULE_TEXT = {"order": "Source order", "recent": "Most recent", "address": "Most recent address",
+             "address-order": "Address by source order"}
 
 
 def _clean(field, value):
@@ -40,15 +41,24 @@ def _newest(records):
     return max(dated, key=lambda r: r.updated_at) if dated else None
 
 
-def build(records):
+def build(records, settings=None):
     """[{field, label, rule, value, record, why, conflict, others: [{record, value, why, same}]}] for a person's
     records (Profile objects with .source)."""
-    by_priority = sorted(records, key=lambda r: (-float(r.source.trust), r.source.name, -(r.updated_at.timestamp() if r.updated_at else 0)))
+    settings = settings or {}
+    order = settings.get("source_order") or []
+    rules = {**{f: rule for f, _, rule in FIELDS}, **{f: ("address" if f == "address" and r == "recent" else r)
+                                                      for f, r in (settings.get("field_rules") or {}).items()}}
+    by_priority = sorted(records, key=lambda r: (order.index(r.source.code) if getattr(r.source, "code", None) in order else len(order),
+                                                 -float(r.source.trust), r.source.name,
+                                                 -(r.updated_at.timestamp() if r.updated_at else 0)))
     rank = {r.id: i for i, r in enumerate(by_priority)}
     with_address = [r for r in records if r.values.get("address")] or [r for r in records if any(r.values.get(f) for f in ADDRESS)]
     home = _newest(with_address) or (by_priority and next((r for r in by_priority if r in with_address), None))
     out = []
     for field, label, rule in FIELDS:
+        rule = rules["address"] if field in ADDRESS else rules.get(field, rule)
+        if field in ADDRESS and rule == "order":
+            rule = "address-order"
         having = [r for r in records if r.values.get(field)]
         row = {"field": field, "label": label, "rule": RULE_TEXT[rule], "value": "", "record": None, "why": "",
                "conflict": False, "others": []}
@@ -64,6 +74,11 @@ def build(records):
             chosen = _newest(having) or min(having, key=lambda r: rank[r.id])
             why = (f"Only {chosen.source.name} has it" if len(having) == 1
                    else f"Most recently updated ({_when(chosen)})" if chosen.updated_at else f"No dates; {chosen.source.name} comes first in source order")
+        elif rule == "address-order":
+            first = min(with_address, key=lambda r: rank[r.id]) if with_address else None
+            chosen = first if first in having else min(having, key=lambda r: rank[r.id])
+            why = (f"Only {chosen.source.name} has it" if len(having) == 1
+                   else f"From the address of {chosen.source.name}, first in source order")
         else:
             chosen = home if home in having else (_newest(having) or min(having, key=lambda r: rank[r.id]))
             why = (f"Only {chosen.source.name} has it" if len(having) == 1
@@ -82,7 +97,7 @@ def build(records):
             elif field in CRITICAL:
                 note = f"Differs: {LABELS.get(field, label)} must be confirmed by a person"
                 row["conflict"] = True
-            elif rule == "order":
+            elif rule in ("order", "address-order"):
                 note = f"Not chosen: {r.source.name} comes later in source order"
             else:
                 note = f"Not chosen: older ({_when(r)})" if r.updated_at else "Not chosen: no last-updated date"

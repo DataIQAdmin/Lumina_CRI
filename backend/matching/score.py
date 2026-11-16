@@ -44,8 +44,10 @@ def name_similarity(a, b):
     return round(best)
 
 
-def score(a, b):
-    """(score, points, conflicts) for two profiles given as {"key": customer id, "keys": {...}, "values": {...}}."""
+def score(a, b, points=None):
+    """(score, points, conflicts) for two profiles given as {"key": customer id, "keys": {...}, "values": {...}}.
+    points: this organization's points per field (Settings); the defaults above when not given."""
+    POINTS_ = points or POINTS
     ka, kb = a["keys"], b["keys"]
     rows, conflicts, total = [], [], 0
 
@@ -57,14 +59,14 @@ def score(a, b):
 
     linked = (ka.get("cross_ref") and ka["cross_ref"] == b["key"]) or (kb.get("cross_ref") and kb["cross_ref"] == a["key"])
     if ka.get("cross_ref") or kb.get("cross_ref"):
-        add("cross_ref", "same" if linked else "missing", POINTS["cross_ref"] if linked else 0,
+        add("cross_ref", "same" if linked else "missing", POINTS_["cross_ref"] if linked else 0,
             "points to the other's Customer ID" if linked else "does not point to the other")
     for field in ("pan", "aadhaar", "dob", "mobile", "email"):
         x, y = ka.get(field), kb.get(field)
         if not x or not y:
             add(field, "missing", 0, "missing on one side")
         elif x == y:
-            add(field, "same", POINTS[field])
+            add(field, "same", POINTS_[field])
         else:
             add(field, "different", 0)
             if field in ("pan", "aadhaar", "dob"):
@@ -74,17 +76,17 @@ def score(a, b):
         add("name", "missing", 0, "missing on one side")
     else:
         add("name", "same" if similarity == 100 else "similar" if similarity >= NAME_FLOOR else "different",
-            round(POINTS["name"] * similarity / 100), f"{similarity}% alike")
+            round(POINTS_["name"] * similarity / 100), f"{similarity}% alike")
         if similarity < NAME_FLOOR:
             conflicts.append("Names are too different")
     return min(total, 100), rows, conflicts
 
 
-def status_of(total, conflicts):
+def status_of(total, conflicts, auto=AUTO, review=REVIEW):
     """"matched", "review" or None (not the same person)."""
-    if total < REVIEW:
+    if total < review:
         return None
-    return "review" if conflicts or total < AUTO else "matched"
+    return "review" if conflicts or total < auto else "matched"
 
 
 def candidate_pairs(profiles):

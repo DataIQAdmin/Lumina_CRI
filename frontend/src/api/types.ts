@@ -781,6 +781,7 @@ export interface PersonRow {
 
 export interface PeoplePage {
   bands: Record<TrustBand, number>
+  weights?: Record<string, number>
   count: number
   page: number
   page_size: number
@@ -808,6 +809,7 @@ export interface PersonDetail extends PersonRow {
   golden: GoldenValue[]
   approval: { by: string; at: string; current: boolean } | null
   can_decide: boolean
+  weights?: Record<string, number>
   records: {
     id: number
     source: string
@@ -820,4 +822,27 @@ export interface PersonDetail extends PersonRow {
     updated_at: string | null
     values: Record<string, string>
   }[]
+}
+
+// Matching, trust and golden record settings (backend matching/settings.py).
+export interface MatchSettingsValues {
+  weights: Record<string, number>
+  bands: { high: number; good: number; review: number }
+  points: Record<string, number>
+  auto: number
+  review: number
+  source_order: string[]
+  field_rules: Record<string, 'order' | 'recent'>
+}
+
+export interface MatchSettingsInfo {
+  settings: MatchSettingsValues
+  defaults: MatchSettingsValues
+  rules: string[]
+  sources: { code: string; name: string }[]
+  golden_fields: { key: string; label: string }[]
+  match_fields: { key: string; label: string }[]
+  updated_by: string
+  updated_at: string | null
+  can_edit: boolean
 }

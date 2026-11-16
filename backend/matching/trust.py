@@ -18,6 +18,7 @@ from django.utils import timezone
 
 from .models import MatchPair, Profile
 from .score import LABELS, name_similarity
+from .settings import current
 
 NEEDED = ["name", "dob", "pan", "aadhaar", "mobile", "email", "address"]
 NEEDED_LABELS = {**LABELS, "address": "Address"}
@@ -29,8 +30,9 @@ RECENCY = [(30, 100), (90, 80), (180, 60), (365, 40)]
 OLD = 20
 
 
-def band_of(score, holds=()):
-    band = next(name for floor, name in BANDS if score >= floor)
+def band_of(score, holds=(), bands=None):
+    floors = [(bands["high"], "High"), (bands["good"], "Good"), (bands["review"], "Review"), (0, "Low")] if bands else BANDS
+    band = next(name for floor, name in floors if score >= floor)
     return "Review" if holds and band in ("High", "Good") else band
 
 
@@ -42,7 +44,7 @@ def recency(updated_at, now):
     return points, f"Last updated {days} day{'' if days == 1 else 's'} ago"
 
 
-def score_profile(p, family, pending, now):
+def score_profile(p, family, pending, now, weights=None):
     """(trust, parts, holds) of one profile. family: the other profiles of the same person; pending: the review
     pairs it is in, as dicts with "conflicts"."""
     parts, holds = {}, []
@@ -94,13 +96,15 @@ def score_profile(p, family, pending, now):
     if failed:
         holds.append(f"{' and '.join(failed)} failed its format rule")
 
-    trust = round(sum(parts[r][0] for r in RULES) * WEIGHT / 100)
+    weights = weights or {r: WEIGHT for r in RULES}
+    trust = round(sum(parts[r][0] * weights[r] for r in RULES) / 100)
     return trust, {r: {"score": parts[r][0], "why": parts[r][1]} for r in RULES}, holds
 
 
 def score_all(now=None):
     """Score every profile again: after matching, and after each decision."""
     now = now or timezone.now()
+    settings = current()
     profiles = list(Profile.objects.select_related("source"))
     people = defaultdict(list)
     for p in profiles:
@@ -111,16 +115,16 @@ def score_all(now=None):
         pending[b].append({"conflicts": conflicts})
     for p in profiles:
         family = [q for q in people[p.person] if q.id != p.id]
-        p.trust, p.parts, p.holds = score_profile(p, family, pending[p.id], now)
-        p.band = band_of(p.trust, p.holds)
+        p.trust, p.parts, p.holds = score_profile(p, family, pending[p.id], now, settings["weights"])
+        p.band = band_of(p.trust, p.holds, settings["bands"])
     Profile.objects.bulk_update(profiles, ["trust", "parts", "holds", "band"], batch_size=500)
 
 
-def person_score(profiles):
+def person_score(profiles, bands=None):
     """(score, band, holds) of a person from their records."""
     scored = [p for p in profiles if p.trust is not None]
     if not scored:
         return None, "", []
     holds = sorted({h for p in scored for h in p.holds})
     score = round(sum(p.trust for p in scored) / len(scored))
-    return score, band_of(score, holds), holds
+    return score, band_of(score, holds, bands), holds
