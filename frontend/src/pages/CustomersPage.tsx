@@ -204,13 +204,13 @@ export function CustomersPage() {
                   <tbody>
                     {pairs.data.results.map((p) => (
                       <tr key={p.id} tabIndex={0} onClick={() => setOpen(p.id)} onKeyDown={(e) => e.key === 'Enter' && setOpen(p.id)}>
-                        <td>
+                        <td className="is-main">
                           <Side side={p.a} />
                         </td>
-                        <td>
+                        <td className="is-main">
                           <Side side={p.b} />
                         </td>
-                        <td>
+                        <td data-label="Score">
                           <span className="dq-filled">
                             <Bar value={p.score} tone={p.conflicts.length ? 'bad' : p.score >= d.auto ? 'good' : 'warn'} />
                             <b className="num">{p.score}</b>
@@ -335,18 +335,18 @@ function PairDialog({ id, canDecide, auto, onClose, onDecided }: { id: number; c
               <tbody>
                 {p.points!.map((r) => (
                   <tr key={r.field} className={r.result === 'different' ? 'is-diff' : undefined}>
-                    <td>{r.label}</td>
-                    <td>
+                    <td className="is-main">{r.label}</td>
+                    <td data-label={p.a.source}>
                       <code>{r.a || <span className="muted">—</span>}</code>
                     </td>
-                    <td>
+                    <td data-label={p.b.source}>
                       <code>{r.b || <span className="muted">—</span>}</code>
                     </td>
-                    <td>
+                    <td data-label="Result">
                       <Pill tone={RESULT[r.result].tone}>{RESULT[r.result].text}</Pill>
                       {r.detail && <small className="cu-detail">{r.detail}</small>}
                     </td>
-                    <td className="num">
+                    <td data-label="Points" className="num">
                       <b>{r.points}</b>
                     </td>
                   </tr>

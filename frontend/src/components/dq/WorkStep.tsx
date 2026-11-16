@@ -308,10 +308,10 @@ function Problems({
               const st = status(c, rows)
               return (
                 <tr key={c.name} tabIndex={0} onClick={() => setOpen(c)} onKeyDown={(e) => e.key === 'Enter' && setOpen(c)}>
-                  <td>
+                  <td className="is-main">
                     <b className="dq-name">{c.name}</b>
                   </td>
-                  <td>
+                  <td data-label="Filled">
                     <span className="dq-filled">
                       <Bar value={pct(c.filled, rows)} tone={c.filled < rows ? 'warn' : undefined} />
                       <span className="num text-sm muted">
@@ -448,13 +448,13 @@ function Rules({
                     const total = c.total ?? 0
                     return (
                       <tr key={c.name} tabIndex={0} onClick={() => setFixing({ column: c.name })} onKeyDown={(e) => e.key === 'Enter' && setFixing({ column: c.name })}>
-                        <td>
+                        <td className="is-main">
                           <b className="dq-name">{c.name}</b>
                         </td>
-                        <td>
+                        <td data-label="Rule">
                           <code className="dq-pattern">{c.pattern}</code>
                         </td>
-                        <td>
+                        <td data-label="Rows that pass">
                           <span className="dq-filled">
                             <Bar value={pct(passed, total)} tone={pct(passed, total) >= 90 ? 'good' : 'warn'} />
                             <span className="num text-sm">
