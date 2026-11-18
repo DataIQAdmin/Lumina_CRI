@@ -12,9 +12,10 @@ export function UnderBuildingPage({ title }: { title: string }) {
         <span className="building-icon">
           <Icon name="layers" size={26} />
         </span>
-        <h2>We are rebuilding this</h2>
+        <span className="building-status">Under development</span>
+        <h2>This workspace is under development</h2>
         <p className="muted">
-          {title} will be back once the new data layers are ready. For now, use{' '}
+          This area is being prepared for the silver-first data platform. Your existing data and services remain in place. For now, use{' '}
           <Link to="/profiling">Data quality</Link>.
         </p>
       </section>

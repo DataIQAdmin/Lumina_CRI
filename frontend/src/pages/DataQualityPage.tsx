@@ -8,8 +8,6 @@ import { useCan } from '../auth/AuthContext'
 import { ConnectorLogo } from '../components/ConnectorLogo'
 import { Dialog } from '../components/Dialog'
 import { Bar, Head, PER_PAGE, Pager } from '../components/dq/kit'
-import { MapStep } from '../components/dq/MapStep'
-import { ReadyStep } from '../components/dq/ReadyStep'
 import { WorkStep } from '../components/dq/WorkStep'
 import { Icon } from '../components/Icon'
 import { Loader } from '../components/Loader'
@@ -17,11 +15,11 @@ import { n, Pill } from '../components/Lx'
 import { EmptyState, ErrorAlert } from '../components/ui'
 import { profileJob } from '../profileJob'
 
-type Step = 'tables' | 'work' | 'map' | 'ready'
-const ORDER: Step[] = ['tables', 'work', 'map', 'ready']
+type Step = 'tables' | 'profiling' | 'rules' | 'silver'
+const ORDER: Step[] = ['tables', 'profiling', 'rules', 'silver']
 
-// Data quality as one straight line: choose a source, choose its tables, check and fix them one by one, map the
-// source's customer fields once, then see what is ready. Everything lives in the address (source, step, the chosen
+// Data quality as one straight line: choose a source and tables, then profile, apply rules, and inspect silver rows.
+// Everything lives in the address (source, step, the chosen
 // tables as t, the open table), so each step can be linked to and the browser's back button works.
 export function DataQualityPage() {
   const raw = useApi(() => api.rawSources(), [])
@@ -46,8 +44,9 @@ export function DataQualityPage() {
   const single = params.get('table')
   let list = params.getAll('t')
   if (!list.length && single) list = [single] // links from Home, search and the regex library open one table
-  const asked = params.get('step') as Step | null
-  const step: Step = !src ? 'tables' : asked && ORDER.includes(asked) && (asked === 'tables' || list.length) ? asked : single ? 'work' : 'tables'
+  const legacyTab = params.get('tab')
+  const asked = (params.get('step') ?? (legacyTab === 'fix' ? 'rules' : legacyTab === 'clean' ? 'silver' : null)) as Step | null
+  const step: Step = !src ? 'tables' : asked && ORDER.includes(asked) && (asked === 'tables' || list.length) ? asked : single ? 'profiling' : 'tables'
   const at = !src ? 0 : ORDER.indexOf(step) + 1
   const current = list.includes(single ?? '') ? single! : list[0]
   const column = params.get('column')
@@ -70,9 +69,9 @@ export function DataQualityPage() {
   const steps = [
     { title: 'Source', detail: src?.name ?? 'Where the data lives' },
     { title: 'Tables', detail: list.length ? `${list.length} chosen` : 'What to work on' },
-    { title: 'Check & fix', detail: step === 'work' && current ? current : 'One table at a time' },
-    { title: 'Map fields', detail: 'Once for the source' },
-    { title: 'Ready', detail: 'What it gives' },
+    { title: 'Profiling', detail: step === 'profiling' && current ? current : 'Inspect column values' },
+    { title: 'Rules', detail: step === 'rules' && current ? current : 'Validate each column' },
+    { title: 'Silver layer', detail: step === 'silver' && current ? current : 'Review processed rows' },
   ]
   const flow = (
     <nav className="dq-flow is-five" aria-label="Steps">
@@ -102,7 +101,7 @@ export function DataQualityPage() {
   if (!src) {
     page = (
       <>
-        <Head title="Data quality" text="Choose a source. Then pick its tables, check and fix them one by one, and map its customer fields." />
+        <Head title="Data quality" text="Profile your source data, apply column rules, and review the resulting silver layer." />
         {flow}
         {sources.length === 0 ? (
           <section className="card">
@@ -130,47 +129,32 @@ export function DataQualityPage() {
           source={src}
           chosen={list}
           canRead={raw.data.can_read}
-          onContinue={(tables) => go('work', { table: tables[0] }, tables)}
+          onContinue={(tables) => go('profiling', { table: tables[0] }, tables)}
         />
-      </>
-    )
-  } else if (step === 'work') {
-    page = (
-      <>
-        {trail}
-        <Head title="Check & fix" text={`Work through ${list.length === 1 ? 'the table' : `the ${list.length} tables`} in order: see the problems, add rules, see the result.`} />
-        {flow}
-        <WorkStep
-          key={`${src.code}:${ended ?? ''}`}
-          source={src}
-          list={list}
-          current={current}
-          canRead={raw.data.can_read}
-          canViewRows={raw.data.can_view_rows}
-          canManage={canManage}
-          ask={ask}
-          onOpen={(t) => go('work', { table: t })}
-          onTables={() => go('tables')}
-          onDone={() => go('map')}
-        />
-      </>
-    )
-  } else if (step === 'map') {
-    page = (
-      <>
-        {trail}
-        <Head title="Map fields" text={`Once for all of ${src.name}: which table and column holds each customer field.`} />
-        {flow}
-        <MapStep code={src.code} source={src.name} onBack={() => go('work', { table: list[list.length - 1] })} onDone={() => go('ready')} />
       </>
     )
   } else {
     page = (
       <>
         {trail}
-        <Head title="Ready" text={`What ${src.name} gives to customer records.`} />
+        <Head title={step === 'profiling' ? 'Data profiling' : step === 'rules' ? 'Column rules' : 'Silver layer'} text={step === 'profiling' ? 'Review completeness, uniqueness, value patterns, and the source rows behind each count.' : step === 'rules' ? 'Apply and manage regular expression rules on each selected table and column.' : 'Inspect rows that passed the rules and rows held back for review.'} />
         {flow}
-        <ReadyStep code={src.code} source={src.name} list={list} canManage={canManage} canViewRows={raw.data.can_view_rows} onOpen={(t) => go('work', { table: t })} onMap={() => go('map')} />
+        <WorkStep
+          key={`${src.code}:${ended ?? ''}`}
+          source={src}
+          list={list}
+          current={current}
+          stage={step}
+          canRead={raw.data.can_read}
+          canViewRows={raw.data.can_view_rows}
+          canManage={canManage}
+          ask={ask}
+          onOpen={(t) => go(step, { table: t })}
+          onTables={() => go('tables')}
+          onDone={() => {
+            if (step !== 'silver') go(step === 'profiling' ? 'rules' : 'silver', { table: current })
+          }}
+        />
       </>
     )
   }
@@ -305,7 +289,6 @@ function TablesStep({ source, chosen, canRead, onContinue }: { source: RawSource
                 <th>Rows</th>
                 <th>Filled</th>
                 <th>Needs attention</th>
-                <th>Fields mapped</th>
               </tr>
             </thead>
             <tbody>
@@ -334,13 +317,12 @@ function TablesStep({ source, chosen, canRead, onContinue }: { source: RawSource
                       )}
                     </td>
                     <td>{d ? d.to_check ? <Pill tone="warn">{d.to_check} column{d.to_check === 1 ? '' : 's'}</Pill> : <Pill tone="ok">All fine</Pill> : '—'}</td>
-                    <td data-label="Fields mapped" className="num muted">{d?.mapped ? n(d.mapped) : '—'}</td>
                   </tr>
                 )
               })}
               {slice.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="muted sx-empty">
+                  <td colSpan={5} className="muted sx-empty">
                     No table matches.
                   </td>
                 </tr>

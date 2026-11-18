@@ -11,7 +11,7 @@ const PAGES: Item[] = [
   { label: 'Home', hint: 'Page', to: '/' },
   { label: 'Sources', hint: 'Page', to: '/sources' },
   { label: 'Data quality', hint: 'Page', to: '/profiling' },
-  { label: 'Customers', hint: 'Page', to: '/customers' },
+  { label: 'Customers and golden records', hint: 'Under development', to: '/customers' },
   { label: 'Settings', hint: 'Page', to: '/settings' },
   { label: 'Users and roles', hint: 'Page', to: '/users' },
 ]

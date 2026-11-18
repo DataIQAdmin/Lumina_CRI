@@ -21,6 +21,7 @@ export function WorkStep({
   source,
   list,
   current,
+  stage,
   canRead,
   canViewRows,
   canManage,
@@ -32,6 +33,7 @@ export function WorkStep({
   source: RawSource
   list: string[]
   current: string
+  stage: 'profiling' | 'rules' | 'silver'
   canRead: boolean
   canViewRows: boolean
   canManage: boolean
@@ -79,6 +81,7 @@ export function WorkStep({
           key={`${current}:${info(current)?.read_at ?? ''}`}
           source={source}
           table={current}
+          stage={stage}
           checked={info(current)}
           checking={running(current)}
           canRead={canRead}
@@ -98,9 +101,11 @@ export function WorkStep({
             <button type="button" className="btn btn-primary" onClick={() => onOpen(list[at + 1])}>
               Next table: {list[at + 1]} →
             </button>
+          ) : stage === 'silver' ? (
+            <span className="muted text-sm">Review the rows below</span>
           ) : (
             <button type="button" className="btn btn-primary" onClick={onDone}>
-              Continue to Map fields →
+              {stage === 'profiling' ? 'Continue to rules →' : 'Continue to silver layer →'}
             </button>
           )}
         </div>
@@ -127,6 +132,7 @@ function Section({ number, title, aside, children }: { number: number; title: Re
 function TableWork({
   source,
   table,
+  stage,
   checked,
   checking,
   canRead,
@@ -136,6 +142,7 @@ function TableWork({
 }: {
   source: RawSource
   table: string
+  stage: 'profiling' | 'rules' | 'silver'
   checked?: RawTable
   checking: boolean
   canRead: boolean
@@ -191,15 +198,24 @@ function TableWork({
   return (
     <>
       {head}
-      <Problems
-        code={source.code}
-        source={source.name}
-        table={p}
-        columns={columns}
-        canViewRows={canViewRows}
-        onFix={canManage ? (column) => setFixing({ column }) : undefined}
-      />
-      {canManage && (
+      {stage === 'profiling' && (
+        <Problems
+          code={source.code}
+          source={source.name}
+          table={p}
+          columns={columns}
+          canViewRows={canViewRows}
+          onFix={canManage ? (column) => setFixing({ column }) : undefined}
+        />
+      )}
+      {stage !== 'profiling' && !canManage && (
+        <section className="card">
+          <EmptyState icon={stage === 'rules' ? 'sliders' : 'layers'} title={`${stage === 'rules' ? 'Rule management' : 'Silver row access'} is restricted`}>
+            Ask a data steward or administrator for the access needed to {stage === 'rules' ? 'manage column rules' : 'view silver rows'}.
+          </EmptyState>
+        </section>
+      )}
+      {stage === 'rules' && canManage && (
         <Rules
           key={version}
           code={source.code}
@@ -212,7 +228,7 @@ function TableWork({
           onChanged={() => setVersion(version + 1)}
         />
       )}
-      {canManage && <Result key={`r${version}`} code={source.code} source={source.name} table={table} />}
+      {stage === 'silver' && canManage && <Result key={`r${version}`} code={source.code} source={source.name} table={table} />}
     </>
   )
 }
@@ -401,7 +417,7 @@ function Rules({
       }
     >
       <p className="dq-summary dq-pad">
-        A <b>format rule</b> says what a correct value looks like. Rows that break a rule are held back from customer records.
+        A <b>format rule</b> says what a correct value looks like. Rows that break a rule are held back from the silver layer.
       </p>
       {rules.error && <ErrorAlert message={rules.error} />}
       {!rules.data && !rules.error && <Loader kind="scan" label="Loading rules" />}
@@ -521,14 +537,14 @@ function Result({ code, source, table }: { code: string; source: string; table: 
           <p className="dq-summary">
             <Explain
               title={`${n(t.passed)} clean rows`}
-              text="Rows that pass every format rule on this table. The other rows are held back so they never reach customer records."
+              text="Rows that pass every format rule on this table. The other rows are held back from the silver layer."
               calc={`${n(t.rows)} rows − ${n(t.rejected)} held back = ${n(t.passed)} clean`}
             >
               <b>
                 {n(t.passed)} of {n(t.rows)} rows
               </b>
             </Explain>{' '}
-            are clean and go on to customer records. <b>{n(t.rejected)}</b> are held back until fixed at the source.
+            pass every rule and enter the silver layer. <b>{n(t.rejected)}</b> are held back until fixed at the source.
           </p>
           <Split
             thick

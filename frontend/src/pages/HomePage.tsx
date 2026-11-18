@@ -60,8 +60,8 @@ export function HomePage() {
   const steps = [
     { done: all.length > 0, title: 'Connect a source', detail: sources.data ? `${n(all.length)} connected` : '…', action: 'Add another', to: '/sources' },
     { done: (c?.tables ?? 0) > 0, title: 'Check the data', detail: c ? `${n(c.tables)} tables checked` : '…', action: 'Check more', to: '/profiling' },
-    { done: (c?.rules ?? 0) > 0, title: 'Fix problems', detail: c ? `${n(c.rules)} format rule${c.rules === 1 ? '' : 's'}` : '…', action: 'Fix now', to: '/profiling' },
-    { done: false, title: 'Review customers', detail: 'Matches, trust scores and golden records', action: 'Open', to: '/customers' },
+    { done: (c?.rules ?? 0) > 0, title: 'Apply quality rules', detail: c ? `${n(c.rules)} format rule${c.rules === 1 ? '' : 's'}` : '…', action: 'Manage rules', to: '/rules' },
+    { done: false, title: 'Customers and golden records', detail: 'Under development', action: 'View status', to: '/customers' },
   ]
   const next = steps.findIndex((s) => !s.done)
   const items: Attention[] = [
@@ -78,7 +78,7 @@ export function HomePage() {
             {greeting()}
             {first ? `, ${first}` : ''}
           </h1>
-          <p>Here is how your customer data looks today.</p>
+          <p>Here is the current state of your data operations.</p>
         </div>
       </header>
 
@@ -136,7 +136,7 @@ export function HomePage() {
               </Explain>
             ) : '…'}
           </b>
-          <span className="muted text-sm">Ready for customer records</span>
+          <span className="muted text-sm">Rows that pass all table rules</span>
         </div>
       </div>
 
