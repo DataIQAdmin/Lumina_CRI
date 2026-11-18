@@ -108,7 +108,7 @@ export function CustomersPage() {
       {s.profiles === 0 ? (
         <section className="card">
           <EmptyState icon="customers" title="Nothing matched yet">
-            Matching uses each source's clean rows and its mapped fields. Finish a source in <Link to="/profiling">Data quality</Link>, then run matching.
+            Matching uses each source's clean rows and its mapped fields. Finish a source in <Link to="/profiling">Data profiling</Link>, then run matching.
           </EmptyState>
         </section>
       ) : tab === 'trust' ? (

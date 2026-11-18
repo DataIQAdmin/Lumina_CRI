@@ -20,7 +20,7 @@ interface Fit {
 }
 
 const rulesLink = (pattern: string, place: Record<string, string> = {}) =>
-  `/profiling?${new URLSearchParams({ ...place, ...(place.table ? { tab: 'fix' } : {}), regex: pattern })}`
+  `/rules?${new URLSearchParams({ ...place, regex: pattern })}`
 
 // Regex library: a tester on top (try a regex on every profiled table, best fit first, and keep it), then the
 // ready-made and saved regexes as cards to test or use in a rule.

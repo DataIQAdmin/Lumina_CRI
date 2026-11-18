@@ -15,13 +15,12 @@ import { n, Pill } from '../components/Lx'
 import { EmptyState, ErrorAlert } from '../components/ui'
 import { profileJob } from '../profileJob'
 
-type Step = 'tables' | 'profiling' | 'rules' | 'silver'
-const ORDER: Step[] = ['tables', 'profiling', 'rules', 'silver']
+type Stage = 'profiling' | 'rules' | 'silver'
+type Step = 'tables' | Stage
 
-// Data quality as one straight line: choose a source and tables, then profile, apply rules, and inspect silver rows.
-// Everything lives in the address (source, step, the chosen
-// tables as t, the open table), so each step can be linked to and the browser's back button works.
-export function DataQualityPage() {
+// Each destination owns its own source and table selection. Selection state stays in the URL so links and browser
+// history keep the user's place inside that destination.
+export function DataQualityPage({ stage }: { stage: Stage }) {
   const raw = useApi(() => api.rawSources(), [])
   const all = useApi(() => api.sources(), [])
   const [params, setParams] = useSearchParams()
@@ -44,10 +43,8 @@ export function DataQualityPage() {
   const single = params.get('table')
   let list = params.getAll('t')
   if (!list.length && single) list = [single] // links from Home, search and the regex library open one table
-  const legacyTab = params.get('tab')
-  const asked = (params.get('step') ?? (legacyTab === 'fix' ? 'rules' : legacyTab === 'clean' ? 'silver' : null)) as Step | null
-  const step: Step = !src ? 'tables' : asked && ORDER.includes(asked) && (asked === 'tables' || list.length) ? asked : single ? 'profiling' : 'tables'
-  const at = !src ? 0 : ORDER.indexOf(step) + 1
+  const step: Step = !src || !list.length || params.get('step') === 'tables' ? 'tables' : stage
+  const at = !src ? 0 : step === 'tables' ? 1 : 2
   const current = list.includes(single ?? '') ? single! : list[0]
   const column = params.get('column')
   const ask = column ? { column, regex: params.get('regex') ?? '' } : null
@@ -62,19 +59,19 @@ export function DataQualityPage() {
     if (i === at) return
     if (i === 0) return setParams({})
     if (!src) return setNotYet('source')
-    if (i > 1 && !list.length) return setNotYet('tables')
-    go(ORDER[i - 1], i === 2 && current ? { table: current } : {})
+    if (i === 1) return go('tables')
+    if (!list.length) return setNotYet('tables')
+    go(stage, current ? { table: current } : {})
   }
 
+  const stageName = stage === 'profiling' ? 'Data profiling' : stage === 'rules' ? 'Rules' : 'Silver layer'
   const steps = [
     { title: 'Source', detail: src?.name ?? 'Where the data lives' },
-    { title: 'Tables', detail: list.length ? `${list.length} chosen` : 'What to work on' },
-    { title: 'Profiling', detail: step === 'profiling' && current ? current : 'Inspect column values' },
-    { title: 'Rules', detail: step === 'rules' && current ? current : 'Validate each column' },
-    { title: 'Silver layer', detail: step === 'silver' && current ? current : 'Review processed rows' },
+    { title: 'Tables', detail: list.length ? `${list.length} chosen` : 'Choose tables to inspect' },
+    { title: stageName, detail: step === stage && current ? current : stage === 'profiling' ? 'Inspect column values' : stage === 'rules' ? 'Validate each column' : 'Review processed rows' },
   ]
   const flow = (
-    <nav className="dq-flow is-five" aria-label="Steps">
+    <nav className="dq-flow" aria-label={`${stageName} workflow`}>
       {steps.map((s, i) => (
         <button key={s.title} type="button" className={i < at ? 'is-done' : i === at ? 'is-now' : undefined} aria-current={i === at ? 'step' : undefined} onClick={() => toStep(i)}>
           <i>{i < at ? <Icon name="check" size={13} /> : i + 1}</i>
@@ -89,7 +86,7 @@ export function DataQualityPage() {
   const trail = src && (
     <nav className="dq-trail" aria-label="You are here">
       <button type="button" onClick={() => setParams({})}>
-        Data quality
+        {stageName}
       </button>
       <Icon name="chevron-right" size={13} />
       <b>{src.name}</b>
@@ -101,7 +98,7 @@ export function DataQualityPage() {
   if (!src) {
     page = (
       <>
-        <Head title="Data quality" text="Profile your source data, apply column rules, and review the resulting silver layer." />
+        <Head title={stageName} text={stage === 'profiling' ? 'Explore column completeness, distinct values, and the rows behind every count.' : stage === 'rules' ? 'Choose tables and apply regular expression rules to individual columns.' : 'Review rows that passed column rules and rows held back.'} />
         {flow}
         {sources.length === 0 ? (
           <section className="card">
@@ -129,7 +126,7 @@ export function DataQualityPage() {
           source={src}
           chosen={list}
           canRead={raw.data.can_read}
-          onContinue={(tables) => go('profiling', { table: tables[0] }, tables)}
+          onContinue={(tables) => go(stage, { table: tables[0] }, tables)}
         />
       </>
     )
@@ -137,7 +134,7 @@ export function DataQualityPage() {
     page = (
       <>
         {trail}
-        <Head title={step === 'profiling' ? 'Data profiling' : step === 'rules' ? 'Column rules' : 'Silver layer'} text={step === 'profiling' ? 'Review completeness, uniqueness, value patterns, and the source rows behind each count.' : step === 'rules' ? 'Apply and manage regular expression rules on each selected table and column.' : 'Inspect rows that passed the rules and rows held back for review.'} />
+        <Head title={stageName} text={stage === 'profiling' ? 'Review completeness, uniqueness, value patterns, and the source rows behind each count.' : stage === 'rules' ? 'Apply and manage regular expression rules on each selected table and column.' : 'Inspect rows that passed the rules and rows held back for review.'} />
         {flow}
         <WorkStep
           key={`${src.code}:${ended ?? ''}`}
@@ -151,9 +148,6 @@ export function DataQualityPage() {
           ask={ask}
           onOpen={(t) => go(step, { table: t })}
           onTables={() => go('tables')}
-          onDone={() => {
-            if (step !== 'silver') go(step === 'profiling' ? 'rules' : 'silver', { table: current })
-          }}
         />
       </>
     )
