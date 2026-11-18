@@ -16,14 +16,16 @@ import { Avatar } from './ui'
 
 type NavItem = { to: string; label: string; icon: IconName; end?: boolean; needs?: Capability[] }
 
-// The menu: the four places people work in, then admin. The regex library sits under Data quality.
+// Data work is split into dedicated destinations; the regex library sits beneath Rules in the menu.
 const GROUPS: { label: string; items: (NavItem & { sub?: boolean })[] }[] = [
   {
     label: '',
     items: [
       { to: '/', label: 'Home', icon: 'overview', end: true },
       { to: '/sources', label: 'Sources', icon: 'connectors' },
-      { to: '/profiling', label: 'Data quality', icon: 'shield' },
+      { to: '/profiling', label: 'Data profiling', icon: 'shield' },
+      { to: '/rules', label: 'Rules', icon: 'sliders' },
+      { to: '/silver', label: 'Silver layer', icon: 'layers' },
       { to: '/regex', label: 'Regex library', icon: 'key', needs: ['manage_sources'], sub: true },
       { to: '/customers', label: 'Customers', icon: 'customers' },
     ],
@@ -46,7 +48,9 @@ const PAGE_TITLES = [
   { path: '/users', title: 'Users and roles' },
   { path: '/settings', title: 'Settings' },
   { path: '/password', title: 'Change password' },
-  { path: '/profiling', title: 'Data quality' },
+  { path: '/profiling', title: 'Data profiling' },
+  { path: '/rules', title: 'Rules' },
+  { path: '/silver', title: 'Silver layer' },
   { path: '/regex', title: 'Regex library' },
 ]
 

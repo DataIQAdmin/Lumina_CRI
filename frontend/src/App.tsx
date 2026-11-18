@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes, useSearchParams } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 
 import type { Capability } from './api/types'
 
@@ -22,14 +22,6 @@ import { NewConnectorPage } from './pages/NewConnectorPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { UnderBuildingPage } from './pages/UnderBuildingPage'
 import { UsersPage } from './pages/UsersPage'
-
-// Old Rules and Silver links open the matching tab of Data quality.
-function ToQuality({ tab }: { tab: string }) {
-  const [params] = useSearchParams()
-  const next = new URLSearchParams(params)
-  if (next.get('table')) next.set('tab', tab)
-  return <Navigate to={`/profiling?${next}`} replace />
-}
 
 function Routed() {
   const { user, checking, logout } = useAuth()
@@ -74,10 +66,10 @@ function Routed() {
         <Route path="/compliance" element={<UnderBuildingPage title="Compliance" />} />
         {can('view_audit') && <Route path="/audit" element={<AuditPage />} />}
         <Route path="/connectors" element={<Navigate to="/sources" replace />} />
-        <Route path="/profiling" element={<DataQualityPage />} />
-        <Route path="/rules" element={<ToQuality tab="fix" />} />
+        <Route path="/profiling" element={<DataQualityPage stage="profiling" />} />
+        <Route path="/rules" element={<DataQualityPage stage="rules" />} />
         {can('manage_sources') && <Route path="/regex" element={<RegexLibraryPage />} />}
-        <Route path="/silver" element={<ToQuality tab="clean" />} />
+        <Route path="/silver" element={<DataQualityPage stage="silver" />} />
         {can('manage_connectors') && <Route path="/connectors/new" element={<NewConnectorPage />} />}
         {can('manage_connectors') && <Route path="/connectors/:code" element={<ConnectorSetupPage />} />}
         <Route path="/how-it-works" element={<UnderBuildingPage title="How it works" />} />

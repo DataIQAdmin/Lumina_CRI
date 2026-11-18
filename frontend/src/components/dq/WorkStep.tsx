@@ -28,7 +28,6 @@ export function WorkStep({
   ask,
   onOpen,
   onTables,
-  onDone,
 }: {
   source: RawSource
   list: string[]
@@ -40,7 +39,6 @@ export function WorkStep({
   ask: { column: string; regex: string } | null
   onOpen: (table: string) => void
   onTables: () => void
-  onDone: () => void
 }) {
   const tables = useApi(() => api.rawTables(source.code), [source.code])
   const job = useSyncExternalStore(profileJob.subscribe, profileJob.get)
@@ -101,12 +99,8 @@ export function WorkStep({
             <button type="button" className="btn btn-primary" onClick={() => onOpen(list[at + 1])}>
               Next table: {list[at + 1]} →
             </button>
-          ) : stage === 'silver' ? (
-            <span className="muted text-sm">Review the rows below</span>
           ) : (
-            <button type="button" className="btn btn-primary" onClick={onDone}>
-              {stage === 'profiling' ? 'Continue to rules →' : 'Continue to silver layer →'}
-            </button>
+            <span className="muted text-sm">All selected tables</span>
           )}
         </div>
       </div>

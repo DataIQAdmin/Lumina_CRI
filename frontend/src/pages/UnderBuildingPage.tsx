@@ -16,7 +16,7 @@ export function UnderBuildingPage({ title }: { title: string }) {
         <h2>This workspace is under development</h2>
         <p className="muted">
           This area is being prepared for the silver-first data platform. Your existing data and services remain in place. For now, use{' '}
-          <Link to="/profiling">Data quality</Link>.
+          <Link to="/profiling">Data profiling</Link>.
         </p>
       </section>
     </>

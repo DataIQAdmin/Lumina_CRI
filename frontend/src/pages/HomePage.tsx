@@ -59,7 +59,7 @@ export function HomePage() {
   const off = all.filter((s) => !s.enabled)
   const steps = [
     { done: all.length > 0, title: 'Connect a source', detail: sources.data ? `${n(all.length)} connected` : '…', action: 'Add another', to: '/sources' },
-    { done: (c?.tables ?? 0) > 0, title: 'Check the data', detail: c ? `${n(c.tables)} tables checked` : '…', action: 'Check more', to: '/profiling' },
+    { done: (c?.tables ?? 0) > 0, title: 'Profile source data', detail: c ? `${n(c.tables)} tables checked` : '…', action: 'Open profiling', to: '/profiling' },
     { done: (c?.rules ?? 0) > 0, title: 'Apply quality rules', detail: c ? `${n(c.rules)} format rule${c.rules === 1 ? '' : 's'}` : '…', action: 'Manage rules', to: '/rules' },
     { done: false, title: 'Customers and golden records', detail: 'Under development', action: 'View status', to: '/customers' },
   ]
