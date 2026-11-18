@@ -40,7 +40,8 @@ export function ColumnDialog({
   ]
   const [good, setGood] = useState<string[] | null>(null)
   const [bad, setBad] = useState<Sample[] | null>(null)
-  const [all, setAll] = useState<string | null>(null)
+  const [all, setAll] = useState<{ label: string; value?: string } | null>(null)
+  const [browse, setBrowse] = useState(false)
   const badCount = badParts.reduce((a, x) => a + x.count, 0)
 
   useEffect(() => {
@@ -115,7 +116,7 @@ export function ColumnDialog({
         )}
       </div>
       {all !== null ? (
-        <Proof code={code} table={table} column={c.name} label={all} onClose={() => setAll(null)} />
+        <Proof code={code} table={table} column={c.name} label={all.label} value={all.value} onClose={() => setAll(null)} />
       ) : (
         <div className="lx-stack">
           <span className="lx-cap">The values</span>
@@ -124,6 +125,10 @@ export function ColumnDialog({
           ) : (
             <>
               <p className="muted text-sm rd-lead">{rule}</p>
+              <button type="button" className="link text-sm dq-browse-values" onClick={() => setBrowse((v) => !v)}>
+                {browse ? 'Hide unique values' : `Browse ${n(c.unique)} unique values`}
+              </button>
+              {browse && <UniqueValues code={code} table={table} column={c.name} onRows={(value) => setAll({ label: value, value })} />}
               <div className="dq-vals">
                 <div className="dq-val is-good">
                   <header>
@@ -133,7 +138,14 @@ export function ColumnDialog({
                     <span>{n(main ? main.count : c.filled)} rows</span>
                   </header>
                   {!main && c.values?.length ? (
-                    c.values.slice(0, 6).map((v) => <Copyable key={v.label} value={v.label} note={`${n(v.count)} rows`} />)
+                  c.values.slice(0, 6).map((v) => (
+                    <div className="dq-unique-value" key={v.label}>
+                      <Copyable value={v.label} />
+                      <button type="button" className="link text-sm" onClick={() => setAll({ label: v.label })} aria-label={`Show ${n(v.count)} rows containing ${v.label}`}>
+                        {n(v.count)} rows →
+                      </button>
+                    </div>
+                  ))
                   ) : good === null ? (
                     <Loader kind="scan" label="Finding values" />
                   ) : good.length === 0 ? (
@@ -156,7 +168,7 @@ export function ColumnDialog({
                       {s.values.map((v) => (
                         <Copyable key={v} value={v} note={s.reason} />
                       ))}
-                      <button type="button" className="link text-sm" onClick={() => setAll(s.label)}>
+                      <button type="button" className="link text-sm" onClick={() => setAll({ label: s.label })}>
                         See all {n(s.count)} {s.label === 'Empty' ? 'empty' : s.label.toLowerCase()} rows →
                       </button>
                     </div>
@@ -171,21 +183,58 @@ export function ColumnDialog({
   )
 }
 
+function UniqueValues({ code, table, column, onRows }: { code: string; table: string; column: string; onRows: (value: string) => void }) {
+  const [page, setPage] = useState(1)
+  const [data, setData] = useState<Awaited<ReturnType<typeof api.rawUniqueValues>> | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  useEffect(() => {
+    let live = true
+    setData(null)
+    setError(null)
+    api.rawUniqueValues(code, table, column, page).then(
+      (got) => live && setData(got),
+      (e: Error) => live && setError(e.message),
+    )
+    return () => { live = false }
+  }, [code, table, column, page])
+  const pages = data ? Math.max(1, Math.ceil(data.unique / data.page_size)) : 1
+  return (
+    <div className="dq-unique-list">
+      {error && <p className="sx-error">{error}</p>}
+      {!data && !error && <Loader kind="scan" label="Loading unique values" />}
+      {data && (
+        <>
+          <div className="dq-unique-head"><b>{n(data.unique)} displayed value groups</b><span className="muted">{n(data.page_size)} per page</span></div>
+          <div className="dq-unique-rows">
+            {data.results.map((item) => (
+              <div className="dq-unique-value" key={item.value}>
+                <code>{item.value}</code>
+                <button type="button" className="link text-sm" onClick={() => onRows(item.value)}>{n(item.count)} rows →</button>
+              </div>
+            ))}
+          </div>
+          <Pager page={page} pages={pages} onPage={setPage} text={`${n(data.unique)} unique values`} />
+        </>
+      )}
+    </div>
+  )
+}
+
 // The rows behind one count: row number, the table's ID and the value itself, 20 at a time.
-function Proof({ code, table, column, label, onClose }: { code: string; table: string; column: string; label: string; onClose: () => void }) {
+function Proof({ code, table, column, label, value, onClose }: { code: string; table: string; column: string; label: string; value?: string; onClose: () => void }) {
   const [page, setPage] = useState(1)
   const [data, setData] = useState<CountProof | null>(null)
   const [error, setError] = useState<string | null>(null)
   useEffect(() => {
     let live = true
-    api.rawProof(code, table, column, label, page).then(
+    api.rawProof(code, table, column, label, page, value).then(
       (got) => live && setData(got),
       (e: Error) => live && setError(e.message),
     )
     return () => {
       live = false
     }
-  }, [code, table, column, label, page])
+  }, [code, table, column, label, page, value])
   const pages = data ? Math.max(1, Math.ceil(data.count / data.page_size)) : 1
   const shown = (v: unknown) => (v === null || v === undefined || v === '' ? <span className="muted">Empty</span> : String(v))
   return (

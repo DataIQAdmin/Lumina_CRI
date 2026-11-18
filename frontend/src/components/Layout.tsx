@@ -113,7 +113,7 @@ export function Layout() {
           <BrandMark />
           <div className="rail-text">
             <div className="brand-name">Lumina</div>
-            <div className="brand-sub">Customer data platform</div>
+            <div className="brand-sub">Data operations platform</div>
           </div>
         </Link>
 

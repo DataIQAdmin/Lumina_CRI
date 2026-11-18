@@ -21,6 +21,7 @@ urlpatterns = [
     path("raw/<slug:code>/read/", raw_views.read),
     path("raw/<slug:code>/rows/", raw_views.rows),
     path("raw/<slug:code>/proof/", raw_views.proof),
+    path("raw/<slug:code>/values/", raw_views.unique_values),
     path("raw/<slug:code>/profile/", raw_views.profile),
     path("mapping/<slug:code>/", mapping_views.mapping),
     path("people/", match_views.people),

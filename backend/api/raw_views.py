@@ -157,12 +157,45 @@ def proof(request, code):
     except ValueError:
         page = 1
     i = table.columns.index(column)
-    found = [(position, shown) for position, plain, shown in rows_of(table) if label_of(profiled, plain[i]) == label]
+    exact = request.query_params.get("value") if "value" in request.query_params else None
+    found = [(position, shown) for position, plain, shown in rows_of(table)
+             if (str(shown[i] or "") == exact if exact is not None else label_of(profiled, plain[i]) == label)]
     start = (page - 1) * PROOF_PAGE
     return Response({"column": column, "label": label, "key": table.columns[0], "count": len(found), "page": page,
                      "page_size": PROOF_PAGE, "results": [
                          {"row": position + 1, "key": shown[0], "value": shown[i]}
                          for position, shown in found[start:start + PROOF_PAGE]]})
+
+
+@api_view(["GET"])
+@permission_classes([HasRole, requires("view_pii")])
+def unique_values(request, code):
+    """GET /api/raw/<code>/values/?table=<name>&column=<name>&page=1  Distinct display-safe values and counts."""
+    from ingestion.rules import rows_of
+
+    source, error = _source(code)
+    if error:
+        return error
+    table, error = _table(source, request.query_params.get("table"))
+    if error:
+        return error
+    column = request.query_params.get("column", "")
+    if column not in table.columns:
+        return Response({"detail": "This table has no such column."}, status=status.HTTP_404_NOT_FOUND)
+    try:
+        page = max(int(request.query_params.get("page", 1)), 1)
+    except ValueError:
+        page = 1
+    i = table.columns.index(column)
+    counts = Counter()
+    for _, _, shown in rows_of(table):
+        value = str(shown[i] or "")
+        if value.strip():
+            counts[value] += 1
+    ordered = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    start = (page - 1) * PROOF_PAGE
+    return Response({"column": column, "unique": len(counts), "page": page, "page_size": PROOF_PAGE,
+                     "results": [{"value": value, "count": count} for value, count in ordered[start:start + PROOF_PAGE]]})
 
 
 @api_view(["GET"])
