@@ -590,6 +590,15 @@ export interface RawTableProfile extends RawTable {
 }
 
 // Rules: one regex per column; only rows passing all of them reach silver (backend ingestion/rules.py).
+// Lumina AI chat: a regex for a format described in words, with no table picked. pattern is '' when the
+// request was not about a format; explanation is then the reply.
+export interface RegexGeneration {
+  pattern: string
+  explanation: string
+  matching: string[] // made-up examples, checked: they pass
+  failing: { value: string; why: string }[] // made-up examples, checked: they fail
+}
+
 export interface RegexCheck {
   valid: boolean
   error: string

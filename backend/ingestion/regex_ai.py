@@ -63,10 +63,13 @@ def describe(table, column):
     return "\n".join(lines)
 
 
-def _ask(messages):
-    """The model's answer to a conversation, as text."""
-    body = json.dumps({"model": settings.LLM_MODEL, "messages": messages, "temperature": 0.1,
-                       "response_format": {"type": "json_object"}}).encode()
+def _ask(messages, json_mode=True):
+    """The model's answer to a conversation, as text. If JSON mode is refused (HTTP 400), asks once more without
+    it; _read pulls the JSON out of plain text too."""
+    payload = {"model": settings.LLM_MODEL, "messages": messages, "temperature": 0.1}
+    if json_mode:
+        payload["response_format"] = {"type": "json_object"}
+    body = json.dumps(payload).encode()
     request = urllib.request.Request(
         settings.LLM_BASE_URL.rstrip("/") + "/chat/completions", data=body, method="POST",
         headers={"Authorization": f"Bearer {settings.LLM_API_KEY.strip()}", "Content-Type": "application/json",
@@ -75,8 +78,20 @@ def _ask(messages):
         with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
             return json.loads(response.read())["choices"][0]["message"]["content"]
     except urllib.error.HTTPError as exc:
-        detail = exc.read()[:300].decode("utf-8", "replace")
+        raw = exc.read()[:20000].decode("utf-8", "replace")
+        detail = raw[:300]
         log.warning("AI helper: HTTP %s from the model API: %s", exc.code, detail)
+        if exc.code == 400 and "json_validate_failed" in raw:
+            # JSON mode refused the answer, usually for a regex backslash like \d that is not a JSON escape.
+            # The provider sends the answer back anyway; _read repairs it.
+            try:
+                failed = json.loads(raw).get("error", {}).get("failed_generation")
+            except ValueError:
+                failed = None
+            if failed:
+                return failed
+        if exc.code == 400 and json_mode and "model" not in detail.lower():
+            return _ask(messages, json_mode=False)
         if exc.code == 429:
             raise AiError("The AI helper is busy. Please try again in a minute.") from exc
         if exc.code == 401:
@@ -95,10 +110,19 @@ def _ask(messages):
 def _read(answer):
     """The model's JSON answer as a dict ({} when it is not JSON)."""
     found = re.search(r"\{.*\}", answer or "", re.S)
-    try:
-        data = json.loads(found.group()) if found else {}
-    except ValueError:
-        data = {}
+    data = {}
+    if found:
+        text = found.group()
+        try:
+            data = json.loads(text)
+        except ValueError:
+            # A regex written straight into JSON: \d, \s, \+ are not JSON escapes. Double every backslash that
+            # does not start a proper escape and try again.
+            try:
+                data = json.loads(re.sub(r"\\(.)", lambda m: m.group(0) if m.group(1) in '\\"/bfnrtu'
+                                         else "\\\\" + m.group(1), text, flags=re.S))
+            except ValueError:
+                data = {}
     return data if isinstance(data, dict) else {}
 
 
@@ -142,3 +166,76 @@ def suggest(table, column, wish=""):
         return {"pattern": pattern, "explanation": explanation, "matching": matching, "failing": failing,
                 "passed": tested["passed"], "failed": tested["failed"], "total": tested["total"]}
     raise AiError("The AI could not write a working regex for this column. Try describing the rule in words.")
+
+
+# ---------- Free-form generator (the Lumina AI chat panel) ----------
+# No table or column is picked: the person describes any format in words ("+91 Indian mobile", "office address",
+# "PAN") and gets a checked regex. Nothing from the data is sent, only the request and the chat so far.
+
+MAX_TURNS = 6  # earlier chat turns sent along, so "make +91 optional" can refine the last answer
+MAX_WISH = 500
+
+GENERATE_SYSTEM = (
+    "You are Lumina AI, a regex assistant inside an Indian bank's customer data platform. The person describes a "
+    "value format in words and you write one regular expression for it. The data holds Indian customer records; "
+    "fields include: customer ID / CIF, name, father's name, date of birth, gender, PAN, Aadhaar, CKYC number, "
+    "passport, voter ID, driving licence, mobile (Indian, may have +91 / 91 / 0 in front), landline, email, "
+    "address lines (home, office, permanent, correspondence), city, state, PIN code (6 digits, not starting with 0), "
+    "country, IFSC, account number, GSTIN, UPI ID, occupation, income, residency, dates, timestamps and amounts. "
+    "Use Indian formats unless the person asks for another country: a mobile number is 10 digits starting 6-9, "
+    "PAN is 5 capitals, 4 digits, 1 capital, Aadhaar is 12 digits not starting 0 or 1, PIN code is 6 digits not "
+    "starting 0, IFSC is 4 capitals, 0, then 6 letters or digits. Be generous with real-world variation (spaces, "
+    "dashes, case) only when the person asks for it or when the format clearly allows it.\n"
+    'Reply with JSON only, exactly like {"pattern": "...", "explanation": "...", "valid_examples": ["...", "..."], '
+    '"invalid_examples": [{"value": "...", "why": "..."}, {"value": "...", "why": "..."}]}. '
+    "The pattern must match the whole value, start with ^ and end with $, and use Python regex syntax (no inline "
+    "flags in the middle). The explanation is one or two short sentences in plain English for someone who does not "
+    "know regex. Give 2 or 3 made-up values that match and 2 or 3 that do not, each with a few words on why it "
+    "fails. If the request is not about a value format, set pattern to \"\" and put a short helpful reply in "
+    "explanation."
+)
+
+
+def _history(history):
+    """The earlier chat turns, cleaned: [{role, content}], newest last, at most MAX_TURNS."""
+    turns = []
+    for item in (history or [])[-MAX_TURNS:]:
+        if not isinstance(item, dict) or item.get("role") not in ("user", "assistant"):
+            continue
+        text = str(item.get("text") or "").strip()[:MAX_WISH]
+        if item.get("regex"):
+            text = f"{text}\nRegex: {str(item['regex'])[:300]}"
+        if text:
+            turns.append({"role": item["role"], "content": text})
+    return turns
+
+
+def generate(wish, history=None):
+    """A checked regex for a format described in words: {pattern, explanation, matching, failing}. pattern is ""
+    when the request was not about a format (the explanation then is the reply). Asks again once if the regex does
+    not compile."""
+    wish = (wish or "").strip()[:MAX_WISH]
+    if not wish:
+        raise AiError("Describe the value format you need.")
+    if not settings.LLM_API_KEY:
+        raise AiError("The AI helper is not set up yet. Pick a regex from the library meanwhile.")
+    messages = [{"role": "system", "content": GENERATE_SYSTEM}, *_history(history), {"role": "user", "content": wish}]
+    for _ in range(2):
+        answer = _ask(messages)
+        data = _read(answer)
+        pattern, explanation = str(data.get("pattern") or "").strip(), str(data.get("explanation") or "").strip()
+        if not pattern:
+            if explanation:
+                return {"pattern": "", "explanation": explanation, "matching": [], "failing": []}
+            messages += [{"role": "assistant", "content": answer},
+                         {"role": "user", "content": "Reply again with the JSON described, with a pattern."}]
+            continue
+        try:
+            compiled = compile_rule(pattern)
+        except RuleError as exc:
+            messages += [{"role": "assistant", "content": answer},
+                         {"role": "user", "content": f"That pattern does not work: {exc} Reply again with JSON."}]
+            continue
+        matching, failing = examples(compiled, data)
+        return {"pattern": pattern, "explanation": explanation, "matching": matching, "failing": failing}
+    raise AiError("The AI could not write a working regex for that. Try describing the format another way.")
