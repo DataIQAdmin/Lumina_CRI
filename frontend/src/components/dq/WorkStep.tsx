@@ -443,13 +443,13 @@ function Rules({
             <p className="muted hm-empty">No rules yet. Without rules no row reaches the clean data.</p>
           ) : (
             <div className="table-wrap">
-              <table className="sx-table">
+              <table className="sx-table dq-rules">
                 <thead>
                   <tr>
-                    <th>Column</th>
+                    <th className="dq-rules-col">Column</th>
                     <th>Rule</th>
-                    <th style={{ width: 220 }}>Rows that pass</th>
-                    <th aria-label="Edit" />
+                    <th className="dq-rules-pass">Rows that pass</th>
+                    <th className="dq-rules-edit" aria-label="Edit" />
                   </tr>
                 </thead>
                 <tbody>

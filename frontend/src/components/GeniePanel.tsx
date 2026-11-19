@@ -53,6 +53,14 @@ function replyFor(result: RegexGeneration) {
   return result.explanation || (result.pattern ? 'Here is a regex for that format.' : 'Describe the value format you need.')
 }
 
+// Any screen can open the Lumina AI panel, e.g. the rule dialog when someone needs a new regex.
+const OPEN_EVENT = 'lumina:open-genie'
+export const openGenie = () => window.dispatchEvent(new Event(OPEN_EVENT))
+export const onOpenGenie = (open: () => void) => {
+  window.addEventListener(OPEN_EVENT, open)
+  return () => window.removeEventListener(OPEN_EVENT, open)
+}
+
 export function GeniePanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [conversations, setConversations] = useState<Conversation[]>(restoreConversations)
   const [activeChat, setActiveChat] = useState(() => restoreConversations()[0]?.id ?? 'chat-start')
