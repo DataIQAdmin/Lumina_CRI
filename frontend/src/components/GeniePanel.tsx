@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { api } from '../api/client'
 import type { RegexGeneration } from '../api/types'
 import { ORG_CODE } from '../organization'
+import { BrandMark } from './BrandMark'
 import { Icon } from './Icon'
 
 type Message = {
@@ -192,5 +193,5 @@ export function GeniePanel({ open, onClose }: { open: boolean; onClose: () => vo
 }
 
 function BrandSymbol() {
-  return <span className="genie-symbol"><span /><span /><span /></span>
+  return <span className="genie-symbol" aria-hidden="true"><BrandMark size={22} /></span>
 }

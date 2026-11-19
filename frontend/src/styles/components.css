@@ -3223,27 +3223,14 @@ code {
 .genie-title > div span { color: var(--text-3); font-size: var(--text-xs); }
 
 .genie-symbol {
-  position: relative;
-  display: inline-block;
+  display: inline-grid;
+  flex: none;
+  place-items: center;
   width: 30px;
   height: 30px;
   border-radius: 10px;
   background: var(--accent-soft);
 }
-
-.genie-symbol span {
-  position: absolute;
-  left: 8px;
-  width: 14px;
-  height: 8px;
-  border: 2px solid var(--accent);
-  border-top: 0;
-  border-radius: 0 0 12px 12px;
-}
-
-.genie-symbol span:nth-child(1) { top: 7px; }
-.genie-symbol span:nth-child(2) { top: 11px; border-color: #d6528a; }
-.genie-symbol span:nth-child(3) { top: 15px; border-color: #23966b; }
 
 .genie-examples { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: var(--text-xs); }
 .genie-examples li { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
