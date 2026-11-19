@@ -9,7 +9,7 @@ import { BrandMark } from './BrandMark'
 import { CommandPalette } from './CommandPalette'
 import { useScrollLock } from './scrollLock'
 import { Icon, type IconName } from './Icon'
-import { GeniePanel } from './GeniePanel'
+import { GeniePanel, onOpenGenie } from './GeniePanel'
 import { ProfileJobPanel } from './ProfileJobPanel'
 import { Avatar } from './ui'
 
@@ -64,6 +64,7 @@ export function Layout() {
   const [palette, setPalette] = useState(false)
   const [genieOpen, setGenieOpen] = useState(false)
   useScrollLock(navOpen)
+  useEffect(() => onOpenGenie(() => setGenieOpen(true)), [])
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
