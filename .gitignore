@@ -19,3 +19,4 @@ Thumbs.db
 
 # Django collectstatic output
 backend/staticfiles/
+pushing-command.txt
