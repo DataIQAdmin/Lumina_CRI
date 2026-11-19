@@ -16,7 +16,7 @@ import { Avatar } from './ui'
 
 type NavItem = { to: string; label: string; icon: IconName; end?: boolean; needs?: Capability[] }
 
-// Data work is split into dedicated destinations; the regex library sits beneath Rules in the menu.
+// Data work is split into dedicated destinations, with the regex library as a peer feature in the menu.
 const GROUPS: { label: string; items: (NavItem & { sub?: boolean })[] }[] = [
   {
     label: '',
@@ -26,7 +26,7 @@ const GROUPS: { label: string; items: (NavItem & { sub?: boolean })[] }[] = [
       { to: '/profiling', label: 'Data profiling', icon: 'shield' },
       { to: '/rules', label: 'Rules', icon: 'sliders' },
       { to: '/silver', label: 'Silver layer', icon: 'layers' },
-      { to: '/regex', label: 'Regex library', icon: 'key', needs: ['manage_sources'], sub: true },
+      { to: '/regex', label: 'Regex library', icon: 'key', needs: ['manage_sources'] },
       { to: '/customers', label: 'Customers', icon: 'customers' },
     ],
   },
