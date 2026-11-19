@@ -7576,7 +7576,8 @@ td.num .count-button {
   overflow: hidden;
 }
 
-.dq-flow button {
+.dq-flow button,
+.dq-flow > div {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -7591,12 +7592,17 @@ td.num .count-button {
   cursor: pointer;
 }
 
-.dq-flow button:last-child {
+.dq-flow button:last-child,
+.dq-flow > div:last-child {
   border-right: 0;
 }
 
 .dq-flow button:hover {
   background: var(--surface-2);
+}
+
+.dq-flow > div {
+  cursor: default;
 }
 
 .dq-flow i {
@@ -7688,6 +7694,8 @@ td.num .count-button {
 .dq-srccard {
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
+  min-height: 210px;
   gap: 14px;
   padding: 18px;
   color: inherit;
@@ -7711,9 +7719,19 @@ td.num .count-button {
   align-self: flex-start;
 }
 
+.dq-card-action {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .dq-facts {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   color: var(--text-3);
   font-size: 12.5px;
@@ -7728,6 +7746,57 @@ td.num .count-button {
   color: var(--text);
   font-size: 18px;
   font-weight: 600;
+}
+
+.dq-connector-workspace {
+  padding: 0;
+  overflow: hidden;
+}
+
+.dq-workspace-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dq-workspace-head .sx-src small {
+  margin-top: 3px;
+}
+
+.dq-workspace-table-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 10px;
+}
+
+.dq-workspace-table-title h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.dq-connector-table tbody tr.clickable {
+  cursor: pointer;
+}
+
+.dq-connector-table tbody tr.clickable:hover td {
+  background: var(--surface-2);
+}
+
+.dq-workspace-empty {
+  padding: 10px 18px 22px;
+}
+
+.dq-access-note {
+  margin: 0;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-3);
+  font-size: 13px;
 }
 
 .dq-bar {
@@ -8041,12 +8110,14 @@ td.num .count-button {
     grid-template-columns: 1fr;
   }
 
-  .dq-flow button {
+  .dq-flow button,
+  .dq-flow > div {
     border-right: 0;
     border-bottom: 1px solid var(--border);
   }
 
-  .dq-flow button:last-child {
+  .dq-flow button:last-child,
+  .dq-flow > div:last-child {
     border-bottom: 0;
   }
 
@@ -8909,7 +8980,8 @@ td.num .count-button {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .dq-flow:not(.is-five) button {
+  .dq-flow:not(.is-five) button,
+  .dq-flow:not(.is-five) > div {
     flex-direction: column;
     gap: 6px;
     padding: 10px 6px;
@@ -8932,7 +9004,8 @@ td.num .count-button {
   }
 
   .dq-flow.is-five button:last-child,
-  .dq-flow:not(.is-five) button:last-child {
+  .dq-flow:not(.is-five) button:last-child,
+  .dq-flow:not(.is-five) > div:last-child {
     border-right: 0;
   }
 

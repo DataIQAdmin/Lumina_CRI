@@ -10,7 +10,10 @@ type Item = { label: string; hint: string; to: string }
 const PAGES: Item[] = [
   { label: 'Home', hint: 'Page', to: '/' },
   { label: 'Sources', hint: 'Page', to: '/sources' },
-  { label: 'Data quality', hint: 'Page', to: '/profiling' },
+  { label: 'Data profiling', hint: 'Page', to: '/profiling' },
+  { label: 'Rules', hint: 'Page', to: '/rules' },
+  { label: 'Silver layer', hint: 'Page', to: '/silver' },
+  { label: 'Regex library', hint: 'Page', to: '/regex' },
   { label: 'Customers and golden records', hint: 'Under development', to: '/customers' },
   { label: 'Settings', hint: 'Page', to: '/settings' },
   { label: 'Users and roles', hint: 'Page', to: '/users' },
