@@ -46,6 +46,7 @@ import type {
   RawTable,
   RawTableProfile,
   RegexCheck,
+  RegexGeneration,
   RegexLibrary,
   RuleColumns,
   RegexSuggestion,
@@ -262,6 +263,8 @@ export const api = {
     post<{ passed: number; failed: number; total: number }>(`/rules/${code}/`, { table, column, pattern }),
   ruleRemove: (code: string, table: string, column: string) =>
     post<{ removed: number }>(`/rules/${code}/remove/`, { table, column }),
+  regexGenerate: (wish: string, history: { role: 'user' | 'assistant'; text: string; regex?: string }[] = []) =>
+    post<RegexGeneration>('/regex/generate/', { wish, history }),
   regexCheck: (pattern: string) => post<RegexCheck>('/regex/check/', { pattern }),
   regexLibrary: () => get<RegexLibrary>('/regex/library/'),
   regexSave: (name: string, pattern: string) => post<SavedRegex>('/regex/library/', { name, pattern }),

@@ -39,6 +39,7 @@ urlpatterns = [
     path("rules/<slug:code>/suggest/", rule_views.suggest),
     path("rules/<slug:code>/remove/", rule_views.remove),
     path("regex/check/", rule_views.check),
+    path("regex/generate/", rule_views.generate),
     path("regex/library/", rule_views.library),
     path("regex/library/<int:pk>/", rule_views.library_item),
     path("regex/test/", rule_views.test),

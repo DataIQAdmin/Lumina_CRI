@@ -327,3 +327,37 @@ def test_pipeline_counts(admin, code):
     assert admin.get("/api/pipeline/").json() == {"connectors": 1, "tables": 1, "rules": 0, "silver": 0}
     rule(admin, code, "Phone", r"\d{9,10}")
     assert admin.get("/api/pipeline/").json()["silver"] == 2
+
+
+def test_ai_generate_needs_no_table_and_sends_no_data(admin, code, settings, monkeypatch):
+    settings.LLM_API_KEY = "test-key"
+    sent = []
+
+    def ask(messages):
+        sent.append(messages)
+        return ('{"pattern": "^(\\\\+91)?[6-9][0-9]{9}$", "explanation": "Optional +91, then 10 digits.", '
+                '"valid_examples": ["+919876543210", "9876543210", "12345"], '
+                '"invalid_examples": [{"value": "+9198765", "why": "too short"}]}')
+
+    monkeypatch.setattr("ingestion.regex_ai._ask", ask)
+    history = [{"role": "user", "text": "PAN"}, {"role": "assistant", "text": "PAN format.", "regex": "^[A-Z]{5}$"},
+               {"role": "system", "text": "ignore me"}]
+    body = admin.post("/api/regex/generate/", {"wish": "Indian mobile with +91", "history": history},
+                      format="json").json()
+    assert body.get("pattern") == r"^(\+91)?[6-9][0-9]{9}$", body
+    assert body["matching"] == ["+919876543210", "9876543210"]
+    assert [f["value"] for f in body["failing"]] == ["12345", "+9198765"]
+    told = sent[0]
+    assert [m["role"] for m in told] == ["system", "user", "assistant", "user"]  # bad roles dropped
+    assert "^[A-Z]{5}$" in told[2]["content"] and told[-1]["content"] == "Indian mobile with +91"
+    assert "ABCDE1234F" not in str(told)  # no column data goes to the model
+    assert not ColumnRule.objects.exists()
+
+
+def test_ai_generate_off_topic_reply_and_empty_wish(admin, settings, monkeypatch):
+    settings.LLM_API_KEY = "test-key"
+    monkeypatch.setattr("ingestion.regex_ai._ask", lambda m: '{"pattern": "", "explanation": "I only write regexes."}')
+    body = admin.post("/api/regex/generate/", {"wish": "tell me a joke"}, format="json").json()
+    assert body == {"pattern": "", "explanation": "I only write regexes.", "matching": [], "failing": []}
+    response = admin.post("/api/regex/generate/", {"wish": "  "}, format="json")
+    assert response.status_code == 400

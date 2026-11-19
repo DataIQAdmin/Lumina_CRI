@@ -16,6 +16,7 @@ from audit.models import AuditEvent
 from audit.services import record
 from ingestion.models import ColumnRule, RawTable, SavedRegex
 from ingestion.regex_ai import AiError
+from ingestion.regex_ai import generate as ai_generate
 from ingestion.regex_ai import suggest as ai_suggest
 from ingestion.regex_library import READY_REGEXES
 from ingestion.rules import RuleError, compile_rule, split, table_rules
@@ -114,6 +115,20 @@ def suggest(request, code):
         return Response(ai_suggest(table, column, str(request.data.get("wish") or "")))
     except AiError as exc:
         return _bad(str(exc))  # not 503: the screen reads 502-504 as "the server is waking up" and waits
+
+
+@api_view(["POST"])
+@permission_classes(RULES)
+@throttle_classes([AiThrottle])
+def generate(request):
+    """POST /api/regex/generate/  {wish, history?}  Lumina AI chat: a regex for any format described in words, with
+    no table or column picked. It comes back compiled and with checked made-up examples; nothing is applied and no
+    data is sent to the AI. history: the earlier chat turns [{role, text, regex?}] so a follow-up can refine it."""
+    history = request.data.get("history")
+    try:
+        return Response(ai_generate(str(request.data.get("wish") or ""), history if isinstance(history, list) else None))
+    except AiError as exc:
+        return _bad(str(exc))
 
 
 @api_view(["POST"])
