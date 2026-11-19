@@ -3,12 +3,14 @@ import { Link } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type { ColumnCounts, RegexLibrary, RulePreview } from '../api/types'
+import { BrandMark } from './BrandMark'
 import { Dialog } from './Dialog'
 import { Examples } from './dq/Examples'
 import { partsOf } from './dq/kit'
 import { Icon } from './Icon'
 import { n, Pill, Split } from './Lx'
 import { LibrarySelect, OfferCard, type Offer, PreviewResult, RegexVerdict, useRegexCheck } from './regex'
+import { openGenie } from './GeniePanel'
 import { useToast } from './Toasts'
 import { ErrorAlert } from './ui'
 
@@ -51,10 +53,7 @@ export function RuleDialog({
   const current = columns.find((c) => c.name === column)
   const [pattern, setPattern] = useState(start || current?.pattern || '')
   const check = useRegexCheck(pattern)
-  const [wish, setWish] = useState('')
-  const [asking, setAsking] = useState(false)
   const [offers, setOffers] = useState<Offer[]>([])
-  const [offerError, setOfferError] = useState<string | null>(null)
   const [preview, setPreview] = useState<RulePreview | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -65,21 +64,7 @@ export function RuleDialog({
     setColumn(name)
     setPattern(columns.find((c) => c.name === name)?.pattern ?? '')
     setOffers([])
-    setOfferError(null)
     setSeeing(false)
-  }
-  const ask = async () => {
-    setAsking(true)
-    setOfferError(null)
-    try {
-      const got = await api.ruleSuggest(code, table, column, wish)
-      const offer: Offer = { source: 'ai', title: got.explanation, pattern: got.pattern, matching: got.matching, failing: got.failing, passed: got.passed, total: got.total }
-      setOffers((old) => [offer, ...old.filter((o) => o.source !== 'ai')])
-    } catch (e) {
-      setOfferError((e as Error).message)
-    } finally {
-      setAsking(false)
-    }
   }
   const fromLibrary = (chosen: string) => {
     const ready = library?.ready.find((r) => r.pattern === chosen)
@@ -166,33 +151,14 @@ export function RuleDialog({
         </div>
         {seeing && <Examples code={code} table={table} column={column} pattern={check?.valid ? pattern : ''} />}
         <div className="lx-ask">
-          <label className="lx-search is-wide">
-            <Icon name="search" size={15} />
-            <input
-              aria-label="Describe the rule in words (optional)"
-              placeholder="Describe the rule, or leave it empty"
-              value={wish}
-              onChange={(e) => setWish(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !asking) ask()
-              }}
-            />
-          </label>
-          <button type="button" className="btn btn-primary" disabled={asking} onClick={ask}>
-            {asking ? 'Thinking…' : 'Suggest with AI'}
-          </button>
           <LibrarySelect library={library} column={column} onPick={fromLibrary} />
+          <button type="button" className="btn" onClick={openGenie}>
+            <BrandMark size={16} /> Ask Lumina AI
+          </button>
         </div>
-        {offerError && <ErrorAlert message={offerError} />}
+        <p className="muted text-sm rd-lead">Need a new regex? Copy values from the records above, ask Lumina AI, then paste its regex below.</p>
         {offers.map((o) => (
-          <OfferCard
-            key={o.source}
-            offer={o}
-            chosen={o.pattern === pattern}
-            busy={asking}
-            onUse={() => setPattern(o.pattern)}
-            onRetry={o.source === 'ai' ? ask : undefined}
-          />
+          <OfferCard key={o.source} offer={o} chosen={o.pattern === pattern} onUse={() => setPattern(o.pattern)} />
         ))}
         <div className="lx-stack">
           <span className="lx-cap">The rule</span>

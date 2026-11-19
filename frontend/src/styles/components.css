@@ -9484,3 +9484,57 @@ td.num .count-button {
     justify-content: space-between;
   }
 }
+
+/* Rules table: the regex gets the free width and wraps inside it, so a narrow page (Lumina AI open) never squeezes
+   it into one character per line or pushes Edit out of view. */
+.dq-rules {
+  table-layout: fixed;
+}
+
+.dq-rules .dq-rules-col {
+  width: 26%;
+}
+
+.dq-rules .dq-rules-pass {
+  width: 190px;
+}
+
+.dq-rules .dq-rules-edit {
+  width: 76px;
+}
+
+.dq-rules .dq-pattern {
+  display: inline-block;
+  max-width: 100%;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.dq-rules .dq-filled .num {
+  white-space: nowrap;
+}
+
+.dq-rules .dq-filled .dq-bar {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 48px;
+}
+
+@media (min-width: 901px) and (max-width: 1400px) {
+  .shell.genie-open .dq-rules .dq-rules-pass {
+    width: 150px;
+  }
+}
+
+/* A dialog opened while Lumina AI is open leaves the panel free, so a regex can be copied from it into the dialog. */
+@media (min-width: 901px) {
+  body:has(.genie-panel.is-open) .dlg-scrim {
+    right: min(440px, 42vw);
+  }
+}
+
+@media (max-width: 900px) {
+  .genie-panel.is-open {
+    z-index: 70;
+  }
+}
