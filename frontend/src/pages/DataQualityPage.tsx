@@ -6,7 +6,6 @@ import type { RawSource, Source } from '../api/types'
 import { useApi } from '../api/useApi'
 import { useCan } from '../auth/AuthContext'
 import { ConnectorLogo } from '../components/ConnectorLogo'
-import { Dialog } from '../components/Dialog'
 import { Bar, Head, PER_PAGE, Pager } from '../components/dq/kit'
 import { WorkStep } from '../components/dq/WorkStep'
 import { Icon } from '../components/Icon'
@@ -16,6 +15,7 @@ import { EmptyState, ErrorAlert } from '../components/ui'
 import { profileJob } from '../profileJob'
 
 type Stage = 'profiling' | 'rules' | 'silver'
+type View = 'connectors' | 'workspace' | 'tables' | 'detail'
 type Step = 'tables' | Stage
 
 // Each destination owns its own source and table selection. Selection state stays in the URL so links and browser
@@ -24,7 +24,6 @@ export function DataQualityPage({ stage }: { stage: Stage }) {
   const raw = useApi(() => api.rawSources(), [])
   const all = useApi(() => api.sources(), [])
   const [params, setParams] = useSearchParams()
-  const [notYet, setNotYet] = useState<'source' | 'tables' | null>(null)
   const job = useSyncExternalStore(profileJob.subscribe, profileJob.get)
   const canManage = useCan('manage_sources')
 
@@ -43,8 +42,8 @@ export function DataQualityPage({ stage }: { stage: Stage }) {
   const single = params.get('table')
   let list = params.getAll('t')
   if (!list.length && single) list = [single] // links from Home, search and the regex library open one table
-  const step: Step = !src || !list.length || params.get('step') === 'tables' ? 'tables' : stage
-  const at = !src ? 0 : step === 'tables' ? 1 : 2
+  const view: View = !src ? 'connectors' : params.get('step') === 'tables' ? 'tables' : list.length ? 'detail' : 'workspace'
+  const at = view === 'tables' ? 1 : 2
   const current = list.includes(single ?? '') ? single! : list[0]
   const column = params.get('column')
   const ask = column ? { column, regex: params.get('regex') ?? '' } : null
@@ -55,31 +54,22 @@ export function DataQualityPage({ stage }: { stage: Stage }) {
     Object.entries(extra).forEach(([k, v]) => p.set(k, v))
     setParams(p)
   }
-  const toStep = (i: number) => {
-    if (i === at) return
-    if (i === 0) return setParams({})
-    if (!src) return setNotYet('source')
-    if (i === 1) return go('tables')
-    if (!list.length) return setNotYet('tables')
-    go(stage, current ? { table: current } : {})
-  }
-
   const stageName = stage === 'profiling' ? 'Data profiling' : stage === 'rules' ? 'Rules' : 'Silver layer'
   const steps = [
     { title: 'Source', detail: src?.name ?? 'Where the data lives' },
     { title: 'Tables', detail: list.length ? `${list.length} chosen` : 'Choose tables to inspect' },
-    { title: stageName, detail: step === stage && current ? current : stage === 'profiling' ? 'Inspect column values' : stage === 'rules' ? 'Validate each column' : 'Review processed rows' },
+    { title: stageName, detail: current ?? (stage === 'profiling' ? 'Inspect column values' : stage === 'rules' ? 'Validate each column' : 'Review processed rows') },
   ]
   const flow = (
     <nav className="dq-flow" aria-label={`${stageName} workflow`}>
       {steps.map((s, i) => (
-        <button key={s.title} type="button" className={i < at ? 'is-done' : i === at ? 'is-now' : undefined} aria-current={i === at ? 'step' : undefined} onClick={() => toStep(i)}>
+        <div key={s.title} className={i < at ? 'is-done' : i === at ? 'is-now' : undefined} aria-current={i === at ? 'step' : undefined}>
           <i>{i < at ? <Icon name="check" size={13} /> : i + 1}</i>
           <span>
             <b>{s.title}</b>
             <small>{s.detail}</small>
           </span>
-        </button>
+        </div>
       ))}
     </nav>
   )
@@ -95,11 +85,10 @@ export function DataQualityPage({ stage }: { stage: Stage }) {
   const info = (code: string) => all.data?.results.find((s) => s.code === code)
 
   let page: ReactNode
-  if (!src) {
+  if (view === 'connectors') {
     page = (
       <>
         <Head title={stageName} text={stage === 'profiling' ? 'Explore column completeness, distinct values, and the rows behind every count.' : stage === 'rules' ? 'Choose tables and apply regular expression rules to individual columns.' : 'Review rows that passed column rules and rows held back.'} />
-        {flow}
         {sources.length === 0 ? (
           <section className="card">
             <EmptyState icon="connectors" title="No sources yet">
@@ -109,13 +98,31 @@ export function DataQualityPage({ stage }: { stage: Stage }) {
         ) : (
           <div className="dq-srcgrid">
             {sources.map((s) => (
-              <SourceCard key={s.code} source={s} info={info(s.code)} onOpen={() => setParams({ source: s.code, step: 'tables' })} />
+              <SourceCard key={`${s.code}:${ended ?? ''}`} source={s} info={info(s.code)} stage={stage} canManage={canManage} onOpen={() => setParams({ source: s.code })} />
             ))}
           </div>
         )}
       </>
     )
-  } else if (step === 'tables') {
+  } else if (view === 'workspace' && src) {
+    page = (
+      <>
+        {trail}
+        <ConnectorWorkspace
+          key={`${src.code}:${stage}:${ended ?? ''}`}
+          source={src}
+          stage={stage}
+          canManage={canManage}
+          onSelectTables={() => setParams({ source: src.code, step: 'tables' })}
+          onOpenTable={(table, tables) => {
+            const p = new URLSearchParams({ source: src.code, step: stage, table })
+            tables.forEach((name) => p.append('t', name))
+            setParams(p)
+          }}
+        />
+      </>
+    )
+  } else if (view === 'tables' && src) {
     page = (
       <>
         {trail}
@@ -130,59 +137,53 @@ export function DataQualityPage({ stage }: { stage: Stage }) {
         />
       </>
     )
-  } else {
+  } else if (src) {
     page = (
       <>
         {trail}
         <Head title={stageName} text={stage === 'profiling' ? 'Review completeness, uniqueness, value patterns, and the source rows behind each count.' : stage === 'rules' ? 'Apply and manage regular expression rules on each selected table and column.' : 'Inspect rows that passed the rules and rows held back for review.'} />
-        {flow}
         <WorkStep
           key={`${src.code}:${ended ?? ''}`}
           source={src}
           list={list}
           current={current}
-          stage={step}
+          stage={stage}
           canRead={raw.data.can_read}
           canViewRows={raw.data.can_view_rows}
           canManage={canManage}
           ask={ask}
-          onOpen={(t) => go(step, { table: t })}
-          onTables={() => go('tables')}
+          onOpen={(t) => go(stage, { table: t })}
+          onTables={() => setParams({ source: src.code })}
         />
       </>
     )
+  } else {
+    page = <ErrorAlert message="This connector is unavailable. Choose a connector to continue." />
   }
 
-  return (
-    <>
-      {page}
-      {notYet && (
-        <Dialog
-          size="sm"
-          title={notYet === 'source' ? 'Select a source first' : 'Choose tables first'}
-          onClose={() => setNotYet(null)}
-          footer={
-            <button type="button" className="btn btn-primary" onClick={() => setNotYet(null)}>
-              {notYet === 'source' ? 'Choose a source' : 'Choose tables'}
-            </button>
-          }
-        >
-          <p className="rd-lead">
-            {notYet === 'source' ? 'Choose the source you want to work on. Its tables appear next.' : 'Tick one or more tables of this source and press Continue.'}
-          </p>
-        </Dialog>
-      )}
-    </>
-  )
+  return <>{page}</>
 }
 
 // ---------------- step 1: sources ----------------
 
-function SourceCard({ source, info, onOpen }: { source: RawSource; info?: Source; onOpen: () => void }) {
+function SourceCard({ source, info, stage, canManage, onOpen }: { source: RawSource; info?: Source; stage: Stage; canManage: boolean; onOpen: () => void }) {
   const tables = useApi(() => api.rawTables(source.code), [source.code])
   const list = tables.data?.tables ?? []
-  const toFix = list.reduce((a, t) => a + (t.to_check ?? 0), 0)
-  const quality = list.length ? Math.round(list.reduce((a, t) => a + (t.filled ?? 100), 0) / list.length) : null
+  const silver = useApi(() => (canManage && stage !== 'profiling' ? api.silverTables(source.code) : Promise.resolve(null)), [source.code, stage, canManage])
+  const clean = silver.data?.tables.filter((t) => t.rules > 0) ?? []
+  const ruleCount = clean.reduce((sum, table) => sum + table.rules, 0)
+  const summaryReady = !!tables.data && (stage === 'profiling' || !canManage || !!silver.data || !!silver.error)
+  const status = !tables.data || (stage !== 'profiling' && canManage && !silver.data && !silver.error) ? 'Loading status…' : stage === 'profiling'
+    ? list.length ? `${n(list.length)} profiled` : 'Not profiled yet'
+    : !canManage ? 'Access restricted'
+      : !list.length ? 'Not profiled yet'
+        : stage === 'rules' ? clean.length ? `${n(clean.length)} tables with rules` : 'No rules applied'
+          : clean.length ? `${n(clean.length)} silver tables` : 'Apply rules first'
+  const facts = stage === 'profiling'
+    ? [{ value: n(list.length), label: 'profiled tables' }, { value: n(list.reduce((sum, table) => sum + table.rows, 0)), label: 'source rows' }]
+    : stage === 'rules'
+      ? [{ value: n(clean.length), label: 'tables with rules' }, { value: n(ruleCount), label: 'column rules' }]
+      : [{ value: n(clean.reduce((sum, table) => sum + table.passed, 0)), label: 'silver rows' }, { value: n(clean.reduce((sum, table) => sum + table.rejected, 0)), label: 'held back' }]
   return (
     <button type="button" className="card dq-srccard" disabled={!source.enabled} onClick={onOpen}>
       <span className="sx-src">
@@ -192,20 +193,97 @@ function SourceCard({ source, info, onOpen }: { source: RawSource; info?: Source
           <small>{info?.connector_label ?? ''}</small>
         </span>
       </span>
-      <Bar value={quality ?? 0} tone={quality === null ? undefined : quality >= 90 ? 'good' : 'warn'} />
       <span className="dq-facts">
-        <span>
-          <b>{quality === null ? '—' : `${quality}%`}</b>filled
-        </span>
-        <span>
-          <b>{tables.data ? n(list.length) : '…'}</b>tables checked
-        </span>
-        <span>
-          <b className={toFix ? 'is-bad-text' : undefined}>{tables.data ? n(toFix) : '…'}</b>to fix
-        </span>
+        {facts.map((fact) => <span key={fact.label}><b>{!summaryReady ? '…' : stage !== 'profiling' && !canManage ? '—' : fact.value}</b>{fact.label}</span>)}
       </span>
+      <Pill tone={status === 'Loading status…' ? 'plain' : stage === 'profiling' ? list.length ? 'ok' : 'plain' : clean.length ? 'ok' : 'warn'}>{status}</Pill>
+      <span className="dq-card-action">{stage === 'profiling' ? list.length ? 'View profiles' : 'Profile tables' : stage === 'rules' ? 'Configure rules' : clean.length ? 'View silver tables' : 'Apply rules'} <Icon name="chevron-right" size={15} /></span>
       {!source.enabled && <Pill tone="warn">Switched off</Pill>}
     </button>
+  )
+}
+
+function ConnectorWorkspace({ source, stage, canManage, onSelectTables, onOpenTable }: {
+  source: RawSource
+  stage: Stage
+  canManage: boolean
+  onSelectTables: () => void
+  onOpenTable: (table: string, tables: string[]) => void
+}) {
+  const raw = useApi(() => api.rawTables(source.code), [source.code])
+  const silver = useApi(() => (canManage && stage !== 'profiling' ? api.silverTables(source.code) : Promise.resolve(null)), [source.code, stage, canManage])
+  const tables = raw.data?.tables ?? []
+  const layer = new Map((silver.data?.tables ?? []).map((table) => [table.name, table]))
+  const stageName = stage === 'profiling' ? 'Profiled tables' : stage === 'rules' ? 'Rules by table' : 'Silver layer tables'
+  const action = stage === 'profiling' ? 'Profile new tables' : 'Apply rules'
+  const hasRules = [...layer.values()].some((table) => table.rules > 0)
+  const rulesTarget = `/rules?source=${encodeURIComponent(source.code)}`
+  const allTables = tables.map((table) => table.name)
+  const openTable = (name: string) => onOpenTable(name, allTables.length ? allTables : [name])
+
+  return (
+    <>
+      <Head title={source.name} text={stage === 'profiling' ? 'Review completed profiles or profile additional tables from this connector.' : stage === 'rules' ? 'Review rule coverage or apply rules to additional tables and columns.' : 'Review silver output or apply rules to add more tables to this layer.'} />
+      <section className="card dq-connector-workspace">
+        <div className="dq-workspace-head">
+          <div className="sx-src">
+            <ConnectorLogo type={source.connector_type} size={38} />
+            <span><b>{source.name}</b><small>{stageName}</small></span>
+          </div>
+          {stage === 'silver' && canManage ? (
+            <Link className="btn btn-primary" to={rulesTarget}>{hasRules ? 'Apply more rules' : 'Apply rules'} <Icon name="chevron-right" size={15} /></Link>
+          ) : stage === 'silver' ? (
+            <button type="button" className="btn btn-primary" disabled>Apply rules</button>
+          ) : (
+            <button type="button" className="btn btn-primary" disabled={!canManage} onClick={onSelectTables}>{action} <Icon name="chevron-right" size={15} /></button>
+          )}
+        </div>
+        {stage !== 'profiling' && !canManage && <p className="dq-access-note">Ask a data steward or administrator to view rule and silver status for this connector.</p>}
+        {raw.error && <ErrorAlert message={raw.error} />}
+        {silver.error && <ErrorAlert message={silver.error} />}
+        {!raw.data && !raw.error && <Loader kind="scan" label="Loading connector tables" />}
+        {stage !== 'profiling' && canManage && !silver.data && !silver.error && <Loader kind="scan" label="Loading rules and silver status" />}
+        {raw.data && (stage === 'profiling' || silver.data || !canManage) && (
+          <>
+            {tables.length === 0 ? (
+              <div className="dq-workspace-empty">
+                <EmptyState icon={stage === 'profiling' ? 'search' : 'layers'} title={stage === 'profiling' ? 'Not profiled yet' : stage === 'rules' ? 'No rules applied yet' : 'No silver tables yet'}>
+                  {stage === 'profiling' ? 'Profile tables from this connector to get started.' : stage === 'rules' ? 'Select a profiled table or add a new table to profile before setting rules.' : 'Apply rules to profiled tables to create silver rows.'}
+                </EmptyState>
+              </div>
+            ) : (
+              <>
+                <div className="dq-workspace-table-title"><h2>{stageName}</h2><span className="muted text-sm">{n(tables.length)} profiled tables</span></div>
+                <div className="table-wrap">
+                  <table className="sx-table dq-connector-table">
+                    <thead><tr><th>Table</th><th>Rows</th><th>{stage === 'profiling' ? 'Profile status' : stage === 'rules' ? 'Rules applied' : 'Silver output'}</th><th className="num">{stage === 'profiling' ? 'Filled' : stage === 'rules' ? 'Rules' : 'Held back'}</th><th /></tr></thead>
+                    <tbody>{tables.map((table) => {
+                      const output = layer.get(table.name)
+                      const hasRules = canManage && !!output?.rules
+                      const restricted = stage !== 'profiling' && !canManage
+                      const available = stage === 'profiling' || (!restricted && (stage === 'rules' || hasRules))
+                      const status = restricted ? 'Restricted' : stage === 'profiling' ? 'Profiled' : stage === 'rules' ? hasRules ? 'Rules applied' : 'No rules yet' : hasRules ? 'Available' : 'Apply rules first'
+                      return (
+                        <tr key={table.name} className={available ? 'clickable' : undefined} tabIndex={available ? 0 : undefined} onClick={() => available && openTable(table.name)} onKeyDown={(event) => available && (event.key === 'Enter' || event.key === ' ') && openTable(table.name)}>
+                          <td className="is-main"><b className="dq-name">{table.name}</b></td>
+                          <td className="num muted">{n(table.rows)}</td>
+                          <td><Pill tone={hasRules || stage === 'profiling' ? 'ok' : 'plain'}>{status}</Pill></td>
+                          <td className="num">{restricted ? '—' : stage === 'profiling' ? `${table.filled ?? 0}%` : stage === 'rules' ? n(output?.rules ?? 0) : n(output?.rejected ?? 0)}</td>
+                          <td className="dq-go">{available && <Icon name="chevron-right" size={16} />}</td>
+                        </tr>
+                      )
+                    })}</tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </>
+        )}
+        {stage !== 'profiling' && canManage && tables.length > 0 && silver.data?.tables.every((table) => table.rules === 0) && (
+          <p className="dq-access-note">No rules have been applied on this connector yet. Use <b>Apply rules</b> to choose tables and columns.</p>
+        )}
+      </section>
+    </>
   )
 }
 
