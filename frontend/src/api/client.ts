@@ -2,7 +2,9 @@
 
 import type {
   MappingChoice,
+  AnswerCheck,
   MatchSettingsInfo,
+  SettingsPreview,
   MatchSettingsValues,
   PeoplePage,
   PersonDetail,
@@ -285,6 +287,8 @@ export const api = {
   matchSettings: () => get<MatchSettingsInfo>('/settings/matching/'),
   saveMatchSettings: (values: MatchSettingsValues) =>
     put<{ settings: MatchSettingsValues; summary: MatchSummary['summary'] }>('/settings/matching/', values),
+  matchSettingsPreview: (values: MatchSettingsValues) => post<SettingsPreview>('/settings/matching/preview/', values),
+  matchCheck: (key: unknown) => post<AnswerCheck>('/match/check/', { key }),
   match: () => get<MatchSummary>('/match/'),
   matchRun: () => post<MatchSummary['summary']>('/match/run/'),
   matchPairs: (show: string, q: string, page: number) =>

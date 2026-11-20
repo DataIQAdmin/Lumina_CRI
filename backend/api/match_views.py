@@ -288,3 +288,115 @@ def settings_view(request):
                      "match_fields": [{"key": f, "label": MATCH_LABELS[f]} for f in DEFAULTS["points"]],
                      "updated_by": saved.updated_by if saved else "", "updated_at": saved.updated_at if saved else None,
                      "can_edit": can(request.user, "manage_settings")})
+
+
+# ---------------- what a settings change would do, before saving ----------------
+
+def _state():
+    """Everything a settings change can move: each record's band and person, each pair's status, each golden value."""
+    records = {p.id: (p.band, p.person, p.trust) for p in Profile.objects.all()}
+    pairs = {(a, b): st for a, b, st in MatchPair.objects.values_list("a_id", "b_id", "status")}
+    golden_values = {(g.person, r["field"]): r["value"] for g in GoldenRecord.objects.all() for r in g.rows}
+    return records, pairs, golden_values
+
+
+@api_view(["POST"])
+@permission_classes([HasRole])
+def settings_preview(request):
+    """POST /api/settings/matching/preview/  The same body as saving. Runs matching with these settings inside a
+    transaction that is always rolled back, and says what would change: nothing is saved."""
+    from django.db import transaction
+
+    from matching.models import MatchSettings
+
+    if not can(request.user, "manage_settings"):
+        return Response({"detail": "Only administrators change these settings."}, status=status.HTTP_403_FORBIDDEN)
+    try:
+        values = clean_settings(request.data)
+    except SettingsError as exc:
+        return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+    before = _state()
+    with transaction.atomic():
+        MatchSettings.objects.update_or_create(pk=1, defaults={"values": values})
+        service.run(request.user.username)
+        after = _state()
+        transaction.set_rollback(True)
+
+    moves = {}
+    for pid, (band, _, _) in before[0].items():
+        new = after[0].get(pid)
+        if new and new[0] != band:
+            key = f"{band or 'None'} → {new[0] or 'None'}"
+            moves[key] = moves.get(key, 0) + 1
+    trust = lambda state: [t for _, _, t in state[0].values() if t is not None]  # noqa: E731
+    average = lambda xs: round(sum(xs) / len(xs)) if xs else None  # noqa: E731
+    people = lambda state: len({p for _, p, _ in state[0].values()})  # noqa: E731
+    pair_changes = sum(1 for k in set(before[1]) | set(after[1]) if before[1].get(k) != after[1].get(k))
+    golden_changes = sum(1 for k in set(before[2]) | set(after[2]) if before[2].get(k) != after[2].get(k))
+    return Response({
+        "records": len(before[0]),
+        "band_changes": sum(moves.values()),
+        "moves": dict(sorted(moves.items(), key=lambda x: -x[1])),
+        "average": {"before": average(trust(before)), "after": average(trust(after))},
+        "people": {"before": people(before), "after": people(after)},
+        "pair_changes": pair_changes,
+        "golden_changes": golden_changes,
+    })
+
+
+# ---------------- proof: matching against a known answer key ----------------
+
+@api_view(["POST"])
+@permission_classes([HasRole, requires("manage_sources")])
+def check_answers(request):
+    """POST /api/match/check/  {key: [{person, core, app: [...], conflict}]}  Compares the people matching found with
+    an answer key that is kept outside Lumina (the demo data's). The key is only read, never stored."""
+    key = request.data.get("key")
+    if not isinstance(key, list) or not all(isinstance(x, dict) and isinstance(x.get("app", []), list) for x in key):
+        return Response({"detail": "This is not an answer key: expected a list of people with core and app IDs."},
+                        status=status.HTTP_400_BAD_REQUEST)
+    person_of = dict(Profile.objects.values_list("key", "person"))
+    truth = {}  # record key -> answer person
+    for x in key:
+        for k in [x.get("core")] + list(x.get("app") or []):
+            if k:
+                truth[str(k)] = str(x.get("person"))
+    review = set()
+    for a, b in MatchPair.objects.filter(status=MatchPair.REVIEW).values_list("a__key", "b__key"):
+        review.add(frozenset((a, b)))
+
+    found = {"shared": [0, 0], "twice": [0, 0], "conflicts": [0, 0], "app_only": [0, 0]}
+    misses, missing = [], []
+    for x in key:
+        keys = [k for k in [x.get("core")] + list(x.get("app") or []) if k]
+        absent = [k for k in keys if k not in person_of]
+        if absent:
+            missing += absent
+            continue
+        together = len({person_of[k] for k in keys}) == 1
+        if x.get("conflict"):
+            found["conflicts"][1] += 1
+            held = not together and any(frozenset((x["core"], a)) in review for a in x["app"])
+            found["conflicts"][0] += held
+            if not held:
+                misses.append({"person": x["person"], "keys": keys, "what": f"{x['conflict'].upper()} differs: should wait for a person"})
+            continue
+        if not x.get("core"):
+            alone = all(k2 == k or truth.get(k2) == x["person"] for k in keys for k2, p in person_of.items() if p == person_of[k])
+            found["app_only"][1] += 1
+            found["app_only"][0] += alone
+            if not alone:
+                misses.append({"person": x["person"], "keys": keys, "what": "App-only customer linked to someone else"})
+            continue
+        bucket = "twice" if len(x.get("app") or []) > 1 else "shared"
+        found[bucket][1] += 1
+        found[bucket][0] += together
+        if not together:
+            misses.append({"person": x["person"], "keys": keys,
+                           "what": "Registered twice in the app, not linked" if bucket == "twice" else "Same customer, not linked"})
+    groups = {}
+    for k, p in person_of.items():
+        groups.setdefault(p, set()).add(truth.get(k, f"solo:{k}"))
+    wrong = sum(1 for answers in groups.values() if len(answers) > 1)
+    return Response({"found": {k: {"right": v[0], "expected": v[1]} for k, v in found.items()},
+                     "wrong_links": wrong, "missing": missing[:20], "missing_count": len(missing), "misses": misses[:30]})

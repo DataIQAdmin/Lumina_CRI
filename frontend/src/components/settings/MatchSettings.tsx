@@ -1,9 +1,10 @@
 import { useState } from 'react'
 
 import { api } from '../../api/client'
-import type { MatchSettingsValues } from '../../api/types'
+import type { MatchSettingsValues, SettingsPreview } from '../../api/types'
 import { useApi } from '../../api/useApi'
 import { formatRelative } from '../../format'
+import { Dialog } from '../Dialog'
 import { Explain } from '../Explain'
 import { Icon } from '../Icon'
 import { Loader } from '../Loader'
@@ -27,6 +28,7 @@ export function MatchSettings() {
   const [draft, setDraft] = useState<MatchSettingsValues | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [preview, setPreview] = useState<SettingsPreview | null>(null)
 
   if (data.error) return <ErrorAlert message={data.error} />
   if (!data.data) return <Loader kind="scan" label="Loading settings" />
@@ -50,11 +52,23 @@ export function MatchSettings() {
   const num = (v: string) => (v === '' ? 0 : Math.max(0, Math.round(Number(v)) || 0))
   const nameOf = (code: string) => d.sources.find((x) => x.code === code)?.name ?? code
 
+  const check = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      setPreview(await api.matchSettingsPreview(s))
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
   const save = async () => {
     setBusy(true)
     setError(null)
     try {
       const done = await api.saveMatchSettings(s)
+      setPreview(null)
       toast('success', `Settings saved and matching run again: ${n(done.summary.people)} people, ${n(done.summary.review + done.summary.conflicts)} to review.`)
       setDraft(null)
       data.reload()
@@ -85,14 +99,15 @@ export function MatchSettings() {
                   Undo changes
                 </button>
               )}
-              <button type="button" className="btn btn-primary" disabled={!dirty || busy || weightSum !== 100} onClick={save}>
-                {busy ? 'Saving and matching…' : 'Save and run matching'}
+              <button type="button" className="btn btn-primary" disabled={!dirty || busy || weightSum !== 100} onClick={check}>
+                {busy ? 'Working out the impact…' : 'Preview and save'}
               </button>
             </div>
           )}
         </div>
         {error && <p className="sx-error hm-empty">{error}</p>}
       </section>
+      {preview && <PreviewDialog preview={preview} busy={busy} onClose={() => setPreview(null)} onSave={save} />}
 
       <div className="st-grid">
         <section className="card">
@@ -222,5 +237,71 @@ export function MatchSettings() {
         </p>
       )}
     </>
+  )
+}
+
+
+// What saving would change, worked out on the real data and then undone: the admin sees the impact before applying.
+function PreviewDialog({ preview: p, busy, onClose, onSave }: { preview: SettingsPreview; busy: boolean; onClose: () => void; onSave: () => void }) {
+  const nothing = p.band_changes === 0 && p.pair_changes === 0 && p.golden_changes === 0
+  return (
+    <Dialog
+      title="Before you save"
+      subtitle="Worked out on today's data. Nothing has changed yet."
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" className="btn" onClick={onClose}>
+            Keep editing
+          </button>
+          <button type="button" className="btn btn-primary" disabled={busy} onClick={onSave}>
+            {busy ? 'Saving and matching…' : 'Save and apply'}
+          </button>
+        </>
+      }
+    >
+      {nothing ? (
+        <p className="rd-lead">No record changes band, no match changes and no golden value changes.</p>
+      ) : (
+        <div className="st-impact">
+          <div className="hm-stats">
+            <div className="card hm-stat">
+              <span className="muted">Records changing band</span>
+              <b>{n(p.band_changes)}</b>
+              <span className="muted text-sm">of {n(p.records)}</span>
+            </div>
+            <div className="card hm-stat">
+              <span className="muted">Average trust</span>
+              <b>
+                {p.average.before ?? '—'} → {p.average.after ?? '—'}
+              </b>
+              <span className="muted text-sm">all records</span>
+            </div>
+            <div className="card hm-stat">
+              <span className="muted">Matches changing</span>
+              <b>{n(p.pair_changes)}</b>
+              <span className="muted text-sm">
+                people {n(p.people.before)} → {n(p.people.after)}
+              </span>
+            </div>
+            <div className="card hm-stat">
+              <span className="muted">Golden values changing</span>
+              <b>{n(p.golden_changes)}</b>
+              <span className="muted text-sm">fields across people</span>
+            </div>
+          </div>
+          {Object.keys(p.moves).length > 0 && (
+            <ul className="st-moves">
+              {Object.entries(p.moves).map(([move, count]) => (
+                <li key={move}>
+                  <span>{move}</span>
+                  <b>{n(count)}</b>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </Dialog>
   )
 }
