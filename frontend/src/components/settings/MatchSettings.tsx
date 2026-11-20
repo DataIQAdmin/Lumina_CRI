@@ -22,6 +22,12 @@ const RULE_LABEL: Record<string, string> = {
 
 // Matching, trust score and golden record settings. Saving runs matching again, so every score and golden record
 // follows the new settings at once.
+// The trust score document's two weight sets: equal to start with, risk-based once the bank approves it.
+const PRESETS: { label: string; hint: string; weights: Record<string, number> }[] = [
+  { label: 'Equal, 20% each', hint: 'The starter model of the trust score document', weights: { uniqueness: 20, recency: 20, completeness: 20, consistency: 20, accuracy: 20 } },
+  { label: 'Risk-based', hint: 'More weight on uniqueness and accuracy: 25 / 10 / 15 / 20 / 30. Use after the bank approves it.', weights: { uniqueness: 25, recency: 10, completeness: 15, consistency: 20, accuracy: 30 } },
+]
+
 export function MatchSettings() {
   const toast = useToast()
   const data = useApi(() => api.matchSettings(), [])
@@ -169,6 +175,18 @@ export function MatchSettings() {
             </h2>
             <span className={`text-sm ${weightSum === 100 ? 'muted' : 'is-bad-text'}`}>Weights add up to {weightSum}%</span>
           </div>
+          {edit && (
+            <div className="st-presets">
+              {PRESETS.map((p) => {
+                const on = d.rules.every((r) => s.weights[r] === p.weights[r])
+                return (
+                  <button key={p.label} type="button" className={`btn btn-sm${on ? ' is-on' : ''}`} aria-pressed={on} title={p.hint} onClick={() => set({ weights: { ...p.weights } })}>
+                    {p.label}
+                  </button>
+                )
+              })}
+            </div>
+          )}
           <div className="st-rows">
             {d.rules.map((r) => (
               <label key={r} className="st-row">

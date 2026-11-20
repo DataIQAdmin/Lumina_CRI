@@ -8,8 +8,8 @@ import { Bar, Pager } from '../dq/kit'
 import { Explain } from '../Explain'
 import { Icon } from '../Icon'
 import { Loader } from '../Loader'
-import { n, Pill } from '../Lx'
-import { ErrorAlert } from '../ui'
+import { n, Pill, Seg } from '../Lx'
+import { Avatar, ErrorAlert } from '../ui'
 
 const BANDS: { band: TrustBand; label: string; range: string; tone: 'ok' | 'warn' | 'bad' | 'plain' }[] = [
   { band: 'High', label: 'High', range: '90–100', tone: 'ok' },
@@ -34,9 +34,10 @@ export function TrustTab() {
   const [band, setBand] = useState('')
   const [q, setQ] = useState('')
   const [page, setPage] = useState(1)
+  const [sort, setSort] = useState<'name' | 'low' | 'high'>('name')
   const navigate = useNavigate()
   const open = (person: string) => navigate(`/customers/${encodeURIComponent(person)}`)
-  const data = useApi(() => api.people(band, q.trim(), page), [band, q, page])
+  const data = useApi(() => api.people(band, q.trim(), page, sort), [band, q, page, sort])
   const d = data.data
   const pages = d ? Math.max(1, Math.ceil(d.count / d.page_size)) : 1
   const pick = (b: string) => {
@@ -74,11 +75,25 @@ export function TrustTab() {
               </button>
             )}
           </span>
+          <span className="cu-tools">
+          <Seg
+            label="Sort"
+            value={sort}
+            onChange={(v) => {
+              setSort(v)
+              setPage(1)
+            }}
+            options={[
+              { value: 'name', label: 'Name A–Z' },
+              { value: 'low', label: 'Lowest trust' },
+              { value: 'high', label: 'Highest trust' },
+            ]}
+          />
           <label className="lx-search">
             <Icon name="search" size={15} />
             <input
-              placeholder="Search name or ID"
-              aria-label="Search name or ID"
+              placeholder="Search name or customer ID"
+              aria-label="Search name or customer ID"
               value={q}
               onChange={(e) => {
                 setQ(e.target.value)
@@ -86,15 +101,16 @@ export function TrustTab() {
               }}
             />
           </label>
+          </span>
         </div>
         <div className="table-wrap">
           <table className="sx-table">
             <thead>
               <tr>
-                <th>Person</th>
-                <th style={{ width: 190 }}>Trust score</th>
+                <th>Customer</th>
+                <th style={{ width: 200 }}>Trust score</th>
                 <th>Found in</th>
-                <th>Holds it back</th>
+                <th>Status</th>
                 <th aria-label="Open" />
               </tr>
             </thead>
@@ -102,11 +118,16 @@ export function TrustTab() {
               {d.results.map((x) => (
                 <tr key={x.person} tabIndex={0} onClick={() => open(x.person)} onKeyDown={(e) => e.key === 'Enter' && open(x.person)}>
                   <td className="is-main">
-                    <span className="cu-side">
-                      <b>
-                        {x.name || 'No name'} {x.approved && <Pill tone="ok">Approved</Pill>}
-                      </b>
-                      <small>{x.person}</small>
+                    <span className="cu-person">
+                      <Avatar name={x.name_from === 'id' ? '#' : x.name} />
+                      <span className="cu-side">
+                        <b className={x.name_from === 'id' ? 'cu-noname' : undefined}>{x.name}</b>
+                        <small>
+                          {x.sources.length} system{x.sources.length === 1 ? '' : 's'}
+                          {x.name_from === 'raw' && ' · name fails its rule'}
+                          {x.name_from === 'id' && ' · no name in any system'}
+                        </small>
+                      </span>
                     </span>
                   </td>
                   <td data-label="Trust score">
@@ -125,7 +146,17 @@ export function TrustTab() {
                       ))}
                     </span>
                   </td>
-                  <td data-label="Holds it back">{x.holds.length ? <span className="is-bad-text text-sm">{x.holds.join('; ')}</span> : <span className="muted text-sm">—</span>}</td>
+                  <td data-label="Status">
+                    {x.holds.length ? (
+                      <span title={x.holds.join('. ')}>
+                        <Pill tone="warn">Needs review</Pill>
+                      </span>
+                    ) : x.approved ? (
+                      <Pill tone="ok">Approved</Pill>
+                    ) : (
+                      <Pill tone="plain">Proposed</Pill>
+                    )}
+                  </td>
                   <td className="dq-go">
                     <Icon name="chevron-right" size={16} />
                   </td>
@@ -134,14 +165,14 @@ export function TrustTab() {
               {d.results.length === 0 && (
                 <tr>
                   <td colSpan={5} className="muted sx-empty">
-                    No person matches.
+                    No customer matches.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-        <Pager page={page} pages={pages} onPage={setPage} text={`${n(d.count)} people · lowest score first`} />
+        <Pager page={page} pages={pages} onPage={setPage} text={`${n(d.count)} customers`} />
       </section>
     </>
   )

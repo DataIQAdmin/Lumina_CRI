@@ -126,15 +126,22 @@ def _people():
 
 def _person(person, profiles, pii, bands=None):
     score, band, holds = person_score(profiles, bands)
+    # The clean name first; else the name a source holds even if it fails its rule; else the customer's ID.
     named = next((p.values.get("name") for p in profiles if p.values.get("name")), "")
-    return {"person": person, "name": named, "score": score, "band": band, "holds": holds,
+    named_from = "clean" if named else ""
+    if not named:
+        named = next(((p.raw or {}).get("name", {}).get("value", "") for p in profiles if (p.raw or {}).get("name", {}).get("value")), "")
+        named_from = "raw" if named else "id"
+    if not named:
+        named = f"Customer {profiles[0].key}" if profiles else person
+    return {"person": person, "name": named, "name_from": named_from, "score": score, "band": band, "holds": holds,
             "sources": [{"source": p.source.name, "key": p.key, "score": p.trust, "band": p.band} for p in profiles]}
 
 
 @api_view(["GET"])
 @permission_classes([HasRole])
 def people(request):
-    """GET /api/people/?band=High|Good|Review|Low&q=&page=1  Every person with their trust score, lowest first."""
+    """GET /api/people/?band=High|Good|Review|Low&q=&sort=name|low|high&page=1  Every person with their trust score."""
     groups = _people()
     settings = current()
     everyone = [_person(k, v, True, settings["bands"]) for k, v in groups.items()]
@@ -149,7 +156,13 @@ def people(request):
     q = request.query_params.get("q", "").strip().lower()
     shown = [x for x in everyone if (not band or x["band"] == band)
              and (not q or q in x["name"].lower() or any(q in s["key"].lower() for s in x["sources"]))]
-    shown.sort(key=lambda x: (x["score"] if x["score"] is not None else -1, x["name"]))
+    order = request.query_params.get("sort", "name")
+    if order == "low":
+        shown.sort(key=lambda x: (x["score"] if x["score"] is not None else -1, x["name"].lower()))
+    elif order == "high":
+        shown.sort(key=lambda x: (-(x["score"] if x["score"] is not None else -1), x["name"].lower()))
+    else:  # by name; customers known only by their ID come last
+        shown.sort(key=lambda x: (x["name_from"] == "id", x["name"].lower()))
     try:
         page = max(int(request.query_params.get("page", 1)), 1)
     except ValueError:

@@ -278,8 +278,8 @@ export const api = {
     get<{ column_names: string[]; page: number; page_size: number; count: number; results: unknown[][] }>(
       `/raw/${code}/rows/?${new URLSearchParams({ table, page: String(page) })}`,
     ),
-  people: (band: string, q: string, page: number) =>
-    get<PeoplePage>(`/people/?${new URLSearchParams({ band, q, page: String(page) })}`),
+  people: (band: string, q: string, page: number, sort: 'name' | 'low' | 'high' = 'name') =>
+    get<PeoplePage>(`/people/?${new URLSearchParams({ band, q, sort, page: String(page) })}`),
   person: (id: string) => get<PersonDetail>(`/people/${encodeURIComponent(id)}/`),
   approveGolden: (id: string) => post<{ approved: boolean }>(`/people/${encodeURIComponent(id)}/approve/`),
   keepApart: (id: string, record: number) =>

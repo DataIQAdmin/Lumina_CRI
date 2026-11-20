@@ -781,6 +781,7 @@ export type TrustBand = 'High' | 'Good' | 'Review' | 'Low'
 export interface PersonRow {
   person: string
   name: string
+  name_from?: 'clean' | 'raw' | 'id' // the clean name, a name failing its rule, or only the customer ID
   score: number | null
   band: TrustBand | ''
   holds: string[]
