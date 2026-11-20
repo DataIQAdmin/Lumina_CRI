@@ -798,9 +798,36 @@ export interface PeoplePage {
   results: PersonRow[]
 }
 
+// One field the consistency or accuracy check looked at, saved when the score was worked out.
+export interface TrustField {
+  field: string
+  label: string
+  mine?: string
+  majority?: string
+  agree?: boolean
+  compared?: number
+  others?: { source: string; key: string; value: string }[]
+  value?: string
+  passed?: boolean
+}
+
+// One of the five checks, with the evidence behind it (backend matching/trust.py).
 export interface TrustPart {
   score: number
   why: string
+  weight?: number
+  points?: number
+  evidence?: {
+    twins?: string[]
+    pending?: string[]
+    date?: string | null
+    days?: number | null
+    band?: string
+    filled?: string[]
+    missing?: string[]
+    needed?: number
+    fields?: TrustField[]
+  }
 }
 
 export interface GoldenValue {
@@ -811,6 +838,7 @@ export interface GoldenValue {
   record: { id: number; source: string; key: string } | null
   why: string
   conflict: boolean
+  agree?: [number, number] | null
   others: { record: { id: number; source: string; key: string }; value: string; why: string; same: boolean }[]
 }
 
@@ -819,6 +847,8 @@ export interface PersonDetail extends PersonRow {
   approval: { by: string; at: string; current: boolean } | null
   can_decide: boolean
   weights?: Record<string, number>
+  settings_version?: number
+  golden_built_at?: string | null
   records: {
     id: number
     source: string
@@ -830,6 +860,7 @@ export interface PersonDetail extends PersonRow {
     rows: { total?: number; clean?: number }
     updated_at: string | null
     values: Record<string, string>
+    settings_version?: number
   }[]
 }
 

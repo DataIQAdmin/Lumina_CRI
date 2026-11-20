@@ -4,7 +4,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import type { PersonDetail } from '../api/types'
 import { useApi } from '../api/useApi'
-import { BAND_TONE, RulesTable } from '../components/customers/TrustTab'
+import { TrustDetail } from '../components/customers/TrustDetail'
+import { BAND_TONE } from '../components/customers/TrustTab'
 import { Dialog } from '../components/Dialog'
 import { Bar } from '../components/dq/kit'
 import { Explain } from '../components/Explain'
@@ -16,7 +17,7 @@ import { ErrorAlert } from '../components/ui'
 import { formatRelative } from '../format'
 
 const HOW =
-  'Each field is chosen on its own. Name, date of birth, gender, PAN and Aadhaar come from the first source in source order (core banking first). Mobile and email come from the record updated last. The address, city, state and pincode come together from the most recently updated address, so an address is never stitched from two places.'
+  'Each field is chosen on its own, from clean values only. Name, date of birth, gender, PAN and Aadhaar come from the first source in source order. Mobile and email come from the record updated last. The address, city, state and pincode come together from the most recently updated address, so an address is never stitched from two places. Press "Why?" on any field to see every value and why it was or was not chosen.'
 
 // A person's golden record: the best value of each field with where it came from and why, the values that were
 // not chosen and why, and every record behind it with its trust score.
@@ -88,7 +89,7 @@ export function GoldenPage() {
                 <span className="is-bad-text">Changed since {p.approval.by} approved it</span>
               )
             ) : (
-              'Not approved yet'
+              'Proposed, not approved yet'
             )}
           </p>
         </div>
@@ -132,7 +133,8 @@ export function GoldenPage() {
                 <th style={{ width: 150 }}>Field</th>
                 <th>Value</th>
                 <th>From</th>
-                <th>Why</th>
+                <th>Sources agree</th>
+                <th aria-label="Why" />
               </tr>
             </thead>
             <tbody>
@@ -174,7 +176,7 @@ export function GoldenPage() {
               <Pill tone={BAND_TONE[r.band] ?? 'plain'}>{r.band}</Pill>
             </span>
             <button type="button" className="btn btn-sm" onClick={() => setTrust(i)}>
-              Trust details
+              Why this score?
             </button>
             {p.can_decide && p.records.length > 1 && (
               <button type="button" className="btn btn-sm btn-ghost" onClick={() => setApart(r)}>
@@ -186,9 +188,8 @@ export function GoldenPage() {
       </section>
 
       {trust !== null && (
-        <Dialog size="lg" title={`${p.records[trust].source} · ${p.records[trust].key}`} subtitle={`Trust score ${p.records[trust].trust} · ${p.records[trust].band}`} onClose={() => setTrust(null)}>
-          {p.records[trust].holds.length > 0 && <p className="dq-why is-bad">{p.records[trust].holds.join('. ')}. This keeps the band at Review at best.</p>}
-          <RulesTable record={p.records[trust]} weights={p.weights} />
+        <Dialog size="lg" title={`${p.records[trust].source} · ${p.records[trust].key}`} subtitle="How this record's trust score was worked out" onClose={() => setTrust(null)}>
+          <TrustDetail record={p.records[trust]} weights={p.weights} />
         </Dialog>
       )}
       {apart && (
@@ -220,12 +221,14 @@ export function GoldenPage() {
 }
 
 function GoldenRow({ g }: { g: PersonDetail['golden'][number] }) {
+  const [open, setOpen] = useState(false)
+  const [agree, of] = g.agree ?? [g.value ? 1 + g.others.filter((o) => o.same).length : 0, g.value ? 1 + g.others.length : 0]
+  const tone = g.conflict ? 'bad' : of === 0 ? 'plain' : agree === of ? 'ok' : 'warn'
   return (
     <>
-      <tr className={`${g.conflict ? 'is-conflict' : ''}${g.others.length ? ' has-others' : ''}`}>
+      <tr className={g.conflict ? 'is-conflict' : undefined}>
         <td className="is-main">
           <b>{g.label}</b>
-          <small className="gd-rule">{g.rule}</small>
         </td>
         <td data-label="Value">{g.value ? <code className="gd-value">{g.value}</code> : <span className="muted">Missing</span>}</td>
         <td data-label="From">
@@ -238,26 +241,58 @@ function GoldenRow({ g }: { g: PersonDetail['golden'][number] }) {
             <span className="muted">—</span>
           )}
         </td>
-        <td data-label="Why" className="text-sm">
-          {g.conflict && <Pill tone="bad">Needs a person</Pill>} {g.why}
+        <td data-label="Sources agree">
+          {g.conflict ? (
+            <Pill tone="bad">Needs a person</Pill>
+          ) : of ? (
+            <span className="gd-agree">
+              <Pill tone={tone}>
+                {agree} of {of}
+              </Pill>
+            </span>
+          ) : (
+            <span className="muted">—</span>
+          )}
+        </td>
+        <td className="dq-go">
+          {g.value && (
+            <button type="button" className="btn btn-sm btn-ghost gd-why-btn" aria-expanded={open} onClick={() => setOpen(!open)}>
+              {open ? 'Hide' : 'Why?'}
+            </button>
+          )}
         </td>
       </tr>
-      {g.others.map((o) => (
-        <tr key={`${g.field}:${o.record.id}`} className={`gd-other${o.same ? ' is-same' : ''}${!o.same && g.conflict ? ' is-conflict' : ''}`}>
-          <td className="muted text-sm">↳ also</td>
-          <td data-label="Also">
-            <code className="gd-value is-muted">{o.value}</code>
+      {open && (
+        <tr className="gd-detail">
+          <td colSpan={5}>
+            <div className="gd-detail-box">
+              <span className="text-sm">
+                <b>{g.rule}:</b> {g.why}
+              </span>
+              <div className="gd-cands">
+                {g.record && (
+                  <div className="gd-cand is-chosen">
+                    <span>
+                      <b>{g.record.source}</b> <small className="muted">{g.record.key}</small>
+                    </span>
+                    <code>{g.value}</code>
+                    <span className="text-sm">Chosen</span>
+                  </div>
+                )}
+                {g.others.map((o) => (
+                  <div key={o.record.id} className={`gd-cand${!o.same && g.conflict ? ' is-conflict' : ''}`}>
+                    <span>
+                      <b>{o.record.source}</b> <small className="muted">{o.record.key}</small>
+                    </span>
+                    <code>{o.value}</code>
+                    <span className="muted text-sm">{o.why}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </td>
-          <td data-label="From">
-            <span className="cu-side">
-              <small>
-                {o.record.source} · {o.record.key}
-              </small>
-            </span>
-          </td>
-          <td data-label="Why" className="muted text-sm">{o.why}</td>
         </tr>
-      ))}
+      )}
     </>
   )
 }

@@ -106,7 +106,11 @@ def test_every_person_gets_a_trust_score_from_the_five_rules(admin):
     assert detail["score"] == round(sum(r["trust"] for r in detail["records"]) / 2)
     app = next(r for r in detail["records"] if r["key"] == "usr_a")
     assert set(app["parts"]) == {"uniqueness", "recency", "completeness", "consistency", "accuracy"}
-    assert app["parts"]["consistency"]["score"] == 100  # name, date of birth and PAN agree with core banking
+    # Date of birth, PAN, mobile and email agree with core banking; "Rohan K" and "Rohan Kumar" have no majority.
+    consistency = app["parts"]["consistency"]
+    assert consistency["score"] == 80 and consistency["points"] == 16
+    assert [f["field"] for f in consistency["evidence"]["fields"] if not f["agree"]] == ["name"]
+    assert app["settings_version"] == 0
     priya = next(x for x in everyone["results"] if any(s["key"] == "usr_b" for s in x["sources"]))
     assert priya["band"] in ("Review", "Low") and "A possible match is waiting for review" in priya["holds"]
 
@@ -164,6 +168,10 @@ def test_settings_change_scores_and_golden_records(admin):
     rohan = Profile.objects.get(key="usr_a").person
     name = next(g for g in admin.get(f"/api/people/{rohan}/").json()["golden"] if g["field"] == "name")
     assert name["value"] == "Rohan K" and name["why"] == "Mobile app comes first in source order"
+    # Every saved score and golden record says which settings version it was worked out with.
+    person = admin.get(f"/api/people/{rohan}/").json()
+    assert person["settings_version"] == 1 and {r["settings_version"] for r in person["records"]} == {1}
+    assert name["agree"] == [1, 2]
 
     # No points for PAN or the CIF reference: Rohan's score falls below 80, so a person decides.
     admin.put("/api/settings/matching/", settings_body(admin, points={"pan": 0, "cross_ref": 0}), format="json")

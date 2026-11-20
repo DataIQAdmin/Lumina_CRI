@@ -14,7 +14,7 @@ from audit.services import record
 from matching import service
 from matching import golden
 from matching.settings import SettingsError, current, clean as clean_settings, GOLDEN_FIELDS, GOLDEN_LABELS, RULES
-from matching.models import GoldenApproval, MatchPair, MatchRun, Profile
+from matching.models import GoldenApproval, GoldenRecord, MatchPair, MatchRun, Profile
 from matching.score import LABELS as MATCH_LABELS
 from matching.trust import person_score
 
@@ -32,7 +32,7 @@ def _side(p):
 def _pair(p, full=False):
     out = {"id": p.id, "score": p.score, "status": p.status, "conflicts": p.conflicts, "a": _side(p.a), "b": _side(p.b),
            "same": [r["label"] for r in p.points if r["result"] == "same"], "decided_by": p.decided_by,
-           "decided_at": p.decided_at}
+           "decided_at": p.decided_at, "settings_version": p.settings_version}
     if full:
         out["points"] = p.points
         out["a"]["updated_at"] = p.a.updated_at
@@ -139,9 +139,11 @@ def people(request):
     settings = current()
     everyone = [_person(k, v, True, settings["bands"]) for k, v in groups.items()]
     approvals = {a.person: a for a in GoldenApproval.objects.filter(person__in=groups)}
+    stored = dict(GoldenRecord.objects.filter(person__in=groups).values_list("person", "rows"))
     for x in everyone:
         a = approvals.get(x["person"])
-        x["approved"] = bool(a) and a.fingerprint == golden.fingerprint(golden.build(groups[x["person"]], settings))
+        rows = stored.get(x["person"])
+        x["approved"] = bool(a and rows is not None) and a.fingerprint == golden.fingerprint(rows)
     bands = {b: sum(1 for x in everyone if x["band"] == b) for b in ("High", "Good", "Review", "Low")}
     band = request.query_params.get("band", "")
     q = request.query_params.get("q", "").strip().lower()
@@ -157,17 +159,38 @@ def people(request):
                      "results": shown[(page - 1) * PAGE: page * PAGE]})
 
 
+def _hidden(field, value, pii):
+    return value if pii or field == "name" or not value else "Hidden"
+
+
+def _parts(parts, pii):
+    """The five checks with their evidence; identity and contact values hidden from people without PII access."""
+    if pii or not parts:
+        return parts
+    out = {}
+    for rule, part in parts.items():
+        evidence = dict(part.get("evidence") or {})
+        if "fields" in evidence:
+            evidence["fields"] = [{**f, **{k: _hidden(f["field"], f[k], False) for k in ("mine", "majority", "value") if k in f},
+                                   "others": [{**o, "value": _hidden(f["field"], o["value"], False)} for o in f.get("others", [])]}
+                                  for f in evidence["fields"]]
+        out[rule] = {**part, "evidence": evidence}
+    return out
+
+
 def _record(p, pii):
-    return {"id": p.id, "source": p.source.name, "key": p.key, "trust": p.trust, "band": p.band, "parts": p.parts,
+    return {"id": p.id, "source": p.source.name, "key": p.key, "trust": p.trust, "band": p.band,
+            "parts": _parts(p.parts, pii), "settings_version": p.settings_version,
             "holds": p.holds, "rows": p.rows, "updated_at": p.updated_at,
             "values": p.values if pii else {"name": p.values.get("name", "")}}
 
 
 def _golden_json(rows, pii):
+    """Saved golden rows (records as dicts) or freshly built ones (records as Profiles), for the screen."""
     hide = lambda field, value: value if pii or field == "name" else "Hidden"  # noqa: E731
-    side = lambda r: {"id": r.id, "source": r.source.name, "key": r.key} if r else None  # noqa: E731
+    side = lambda r: (r if isinstance(r, dict) else {"id": r.id, "source": r.source.name, "key": r.key}) if r else None  # noqa: E731
     return [{"field": x["field"], "label": x["label"], "rule": x["rule"], "value": hide(x["field"], x["value"]) if x["value"] else "",
-             "record": side(x["record"]), "why": x["why"], "conflict": x["conflict"],
+             "record": side(x["record"]), "why": x["why"], "conflict": x["conflict"], "agree": x.get("agree"),
              "others": [{"record": side(o["record"]), "value": hide(x["field"], o["value"]), "why": o["why"], "same": o["same"]}
                         for o in x["others"]]} for x in rows]
 
@@ -182,12 +205,15 @@ def person(request, person):
         return Response({"detail": "No such person."}, status=status.HTTP_404_NOT_FOUND)
     pii = can(request.user, "view_pii")
     settings = current()
-    rows = golden.build(found, settings)
+    saved = GoldenRecord.objects.filter(person=person).first()
+    rows = saved.rows if saved else golden.build(found, settings)
     approval = GoldenApproval.objects.filter(person=person).first()
     out = _person(person, found, pii, settings["bands"])
     out["weights"] = settings["weights"]
     out["records"] = [_record(p, pii) for p in found]
     out["golden"] = _golden_json(rows, pii)
+    out["golden_built_at"] = saved.built_at if saved else None
+    out["settings_version"] = saved.settings_version if saved else settings["version"]
     out["approval"] = {"by": approval.approved_by, "at": approval.approved_at,
                        "current": approval.fingerprint == golden.fingerprint(rows)} if approval else None
     out["can_decide"] = can(request.user, "decide_matches")
@@ -201,7 +227,8 @@ def approve(request, person):
     found = list(Profile.objects.select_related("source").filter(person=person))
     if not found:
         return Response({"detail": "No such person."}, status=status.HTTP_404_NOT_FOUND)
-    rows = golden.build(found, current())
+    saved = GoldenRecord.objects.filter(person=person).first()
+    rows = saved.rows if saved else golden.build(found, current())
     if any(x["conflict"] for x in rows):
         return Response({"detail": "Some identity details differ between sources. Settle them first: keep a record "
                                    "apart, or fix the value at its source."}, status=status.HTTP_400_BAD_REQUEST)
@@ -243,7 +270,10 @@ def settings_view(request):
             values = clean_settings(request.data)
         except SettingsError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        MatchSettings.objects.update_or_create(pk=1, defaults={"values": values, "updated_by": request.user.username})
+        from django.db.models import F
+
+        row, _ = MatchSettings.objects.update_or_create(pk=1, defaults={"values": values, "updated_by": request.user.username})
+        MatchSettings.objects.filter(pk=1).update(version=F("version") + 1)
         record(request, AuditEvent.SETTINGS_CHANGED, target="matching settings", **values)
         summary = service.run(request.user.username)
         return Response({"settings": values, "summary": summary})

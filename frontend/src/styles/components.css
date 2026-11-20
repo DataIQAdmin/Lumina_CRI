@@ -9551,3 +9551,333 @@ td.num .count-button {
     z-index: 70;
   }
 }
+
+/* ---------------- Trust score evidence (customers/TrustDetail.tsx) ---------------- */
+.tx {
+  --tx-1: #4f7ae8;
+  --tx-2: #14a3a3;
+  --tx-3: #2fa36b;
+  --tx-4: #d99a29;
+  --tx-5: #8b6be8;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tx-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.tx-ring {
+  --tone: var(--text-3);
+  position: relative;
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: conic-gradient(var(--tone) calc(var(--v) * 1%), var(--surface-sunken) 0);
+}
+
+.tx-ring::after {
+  content: '';
+  position: absolute;
+  inset: 7px;
+  border-radius: 50%;
+  background: var(--surface);
+}
+
+.tx-ring b {
+  position: relative;
+  z-index: 1;
+  font-size: 24px;
+}
+
+.tx-ring.is-ok { --tone: var(--good-dot); }
+.tx-ring.is-warn { --tone: var(--warn-dot); }
+.tx-ring.is-bad { --tone: var(--bad-dot); }
+
+.tx-head-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tx-band {
+  display: flex;
+  gap: 6px;
+}
+
+.tx-stack {
+  display: flex;
+  height: 14px;
+  overflow: hidden;
+  border-radius: 7px;
+  background: var(--surface-sunken);
+}
+
+.tx-stack i {
+  display: block;
+  height: 100%;
+}
+
+.tx-stack i + i {
+  box-shadow: inset 2px 0 0 var(--surface);
+}
+
+.tx-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: -6px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.tx-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tx-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+}
+
+.tx-legend i.is-lost {
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.tx-checks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 10px);
+  overflow: hidden;
+}
+
+.tx-checks li + li {
+  border-top: 1px solid var(--border);
+}
+
+.tx-check {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 14px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tx-check:hover {
+  background: var(--surface-2);
+}
+
+.tx-check > i {
+  flex-shrink: 0;
+  width: 4px;
+  height: 30px;
+  border-radius: 2px;
+}
+
+.tx-check-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tx-points {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  white-space: nowrap;
+}
+
+.tx-points small {
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.tx-check > svg {
+  flex-shrink: 0;
+  color: var(--text-3);
+  transition: transform 150ms ease;
+}
+
+.tx-checks li.is-open .tx-check > svg {
+  transform: rotate(90deg);
+}
+
+.tx-evidence {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 2px 14px 14px 30px;
+}
+
+.tx-evidence p {
+  margin: 0;
+}
+
+.tx-bands {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.tx-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tx-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.tx-chip.is-good { background: var(--good-bg); color: var(--good-text); }
+.tx-chip.is-bad { background: var(--bad-bg); color: var(--bad-text); }
+
+.tx-table {
+  width: 100%;
+}
+
+.tx-table tr.is-diff td {
+  background: var(--bad-bg);
+}
+
+.tx-table code {
+  overflow-wrap: anywhere;
+}
+
+.tx-calc {
+  display: block;
+  padding: 7px 10px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.tx-calc.is-total {
+  font-size: 12.5px;
+}
+
+/* ---------------- Golden record, simple first (GoldenPage.tsx) ---------------- */
+.gd-agree {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.gd-why-btn {
+  white-space: nowrap;
+}
+
+.gd-detail td {
+  background: var(--surface-2);
+}
+
+.gd-detail-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 2px 0 4px;
+}
+
+.gd-cands {
+  display: grid;
+  gap: 6px;
+}
+
+.gd-cand {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.6fr);
+  gap: 10px;
+  align-items: center;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 13px;
+}
+
+.gd-cand.is-chosen {
+  border-color: var(--good-dot);
+  background: var(--good-bg);
+}
+
+.gd-cand.is-conflict {
+  border-color: var(--bad-dot);
+  background: var(--bad-bg);
+}
+
+.gd-cand code {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .gd-cand {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}
+
+/* ---------------- Match score threshold (CustomersPage.tsx) ---------------- */
+.mx-scale {
+  position: relative;
+  height: 34px;
+  margin: 2px 0 6px;
+}
+
+.mx-track {
+  position: absolute;
+  top: 8px;
+  right: 0;
+  left: 0;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--bad-bg) 0 var(--review), var(--warn-bg) var(--review) var(--auto), var(--good-bg) var(--auto) 100%);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.mx-mark {
+  position: absolute;
+  top: 3px;
+  width: 4px;
+  height: 18px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: var(--text);
+}
+
+.mx-lab {
+  position: absolute;
+  top: 21px;
+  color: var(--text-3);
+  font-size: 11px;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}

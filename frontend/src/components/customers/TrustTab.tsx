@@ -24,10 +24,10 @@ const RULES: { key: keyof PersonDetail['records'][number]['parts']; label: strin
   { key: 'uniqueness', label: 'Uniqueness', how: '100 no duplicate · 50 waiting for review · 0 duplicate in the same system' },
   { key: 'recency', label: 'Recency', how: 'Last updated: 0–30 days 100 · 31–90 80 · 91–180 60 · 181–365 40 · older 20' },
   { key: 'completeness', label: 'Completeness', how: 'Needed fields filled, out of 7' },
-  { key: 'consistency', label: 'Consistency', how: 'Name, date of birth, PAN and Aadhaar agree with the other systems' },
-  { key: 'accuracy', label: 'Accuracy', how: "The customer's rows that pass every format rule" },
+  { key: 'consistency', label: 'Consistency', how: "Needed fields agreeing with the value most of the customer's records hold" },
+  { key: 'accuracy', label: 'Accuracy', how: 'Filled fields passing their column rule' },
 ]
-const HOW = 'Five rules, weighted as set on Settings (the trust score document uses 20% each): uniqueness, recency, completeness, consistency and accuracy. A person scores the average of their records. A high score never overrides an unresolved match, conflicting identity details or a PAN or Aadhaar that failed its rule: these keep the band at Review.'
+const HOW = 'Five rules, weighted as set on Settings (the trust score document uses 20% each): uniqueness, recency, completeness, consistency and accuracy. An empty value lowers completeness only. A person scores the average of their records. A high score never overrides an unresolved match, conflicting identity details or a PAN or Aadhaar that failed its rule: these keep the band at Review.'
 
 // Trust scores: every person, lowest first, with the five rules behind each score.
 export function TrustTab() {
@@ -146,56 +146,3 @@ export function TrustTab() {
     </>
   )
 }
-
-// The five rules of one record: score, its weight (20% each by default, set on Settings), its points, and why.
-export function RulesTable({ record: r, weights }: { record: PersonDetail['records'][number]; weights?: Record<string, number> }) {
-  const w = (key: string) => weights?.[key] ?? 20
-  const share = (key: (typeof RULES)[number]['key']) => ((r.parts[key].score * w(key)) / 100).toFixed(1).replace(/\.0$/, '')
-  return (
-    <div className="table-wrap">
-      <table className="lx-mini tr-rules">
-        <thead>
-          <tr>
-            <th>Rule</th>
-            <th className="num">Score</th>
-            <th className="num">Weight</th>
-            <th className="num">Points</th>
-            <th>Why</th>
-          </tr>
-        </thead>
-        <tbody>
-          {RULES.map((rule) => {
-            const part = r.parts[rule.key]
-            return (
-              <tr key={rule.key}>
-                <td className="is-main">
-                  <Explain title={rule.label} text={rule.how}>
-                    {rule.label}
-                  </Explain>
-                </td>
-                <td className="num" data-label="Score">
-                  <b className={part.score >= 75 ? 'is-good-text' : part.score >= 50 ? undefined : 'is-bad-text'}>{part.score}</b>
-                </td>
-                <td className="num muted" data-label="Weight">{w(rule.key)}%</td>
-                <td className="num" data-label="Points">{share(rule.key)}</td>
-                <td className="text-sm tr-why">{part.why}</td>
-              </tr>
-            )
-          })}
-        </tbody>
-        <tfoot>
-          <tr>
-            <td colSpan={3}>
-              <b>Trust score</b>
-            </td>
-            <td className="num">
-              <b>{r.trust}</b>
-            </td>
-            <td className="muted text-sm">{RULES.map((rule) => share(rule.key)).join(' + ')}</td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-  )
-}
-

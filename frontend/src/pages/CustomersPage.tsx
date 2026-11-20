@@ -89,9 +89,14 @@ export function CustomersPage() {
         text="One person per real customer, found across every source, each with a trust score you can trace."
         actions={
           d.can_run && (
-            <button type="button" className="btn btn-primary" disabled={running} onClick={run}>
-              <Icon name="refresh" size={15} /> {running ? 'Matching…' : s.profiles ? 'Run matching again' : 'Run matching'}
-            </button>
+            <>
+              <Link className="btn" to="/customers/mapping">
+                <Icon name="sliders" size={15} /> Map fields
+              </Link>
+              <button type="button" className="btn btn-primary" disabled={running} onClick={run}>
+                <Icon name="refresh" size={15} /> {running ? 'Matching…' : s.profiles ? 'Run matching again' : 'Run matching'}
+              </button>
+            </>
           )
         }
       />
@@ -108,7 +113,7 @@ export function CustomersPage() {
       {s.profiles === 0 ? (
         <section className="card">
           <EmptyState icon="customers" title="Nothing matched yet">
-            Matching uses each source's clean rows and its mapped fields. Finish a source in <Link to="/profiling">Data profiling</Link>, then run matching.
+            Matching reads each source's clean silver rows through its mapped fields. {d.can_run ? <><Link to="/customers/mapping">Map the fields</Link> of each source, then run matching.</> : 'Ask an administrator to map the fields and run matching.'}
           </EmptyState>
         </section>
       ) : tab === 'trust' ? (
@@ -243,7 +248,7 @@ export function CustomersPage() {
           </section>
         </>
       )}
-      {open !== null && <PairDialog id={open} canDecide={d.can_decide} auto={d.auto} onClose={() => setOpen(null)} onDecided={refresh} />}
+      {open !== null && <PairDialog id={open} canDecide={d.can_decide} auto={d.auto} review={d.review} onClose={() => setOpen(null)} onDecided={refresh} />}
     </>
   )
 }
@@ -262,7 +267,7 @@ function Side({ side }: { side: MatchPairRow['a'] }) {
 }
 
 // One pair side by side: every field, whether it agrees, and the points behind the score.
-function PairDialog({ id, canDecide, auto, onClose, onDecided }: { id: number; canDecide: boolean; auto: number; onClose: () => void; onDecided: () => void }) {
+function PairDialog({ id, canDecide, auto, review, onClose, onDecided }: { id: number; canDecide: boolean; auto: number; review: number; onClose: () => void; onDecided: () => void }) {
   const toast = useToast()
   const pair = useApi(() => api.matchPair(id), [id])
   const [busy, setBusy] = useState(false)
@@ -310,6 +315,19 @@ function PairDialog({ id, canDecide, auto, onClose, onDecided }: { id: number; c
       {!p && !pair.error && <Loader kind="scan" label="Loading the pair" />}
       {p && (
         <>
+          <div className="mx-scale" style={{ ['--review' as string]: `${review}%`, ['--auto' as string]: `${auto}%` }} role="img" aria-label={`Score ${p.score} of 100`}>
+            <div className="mx-track" />
+            <div className="mx-mark" style={{ left: `${p.score}%` }} />
+            <span className="mx-lab" style={{ left: `${review / 2}%` }}>
+              Different people
+            </span>
+            <span className="mx-lab" style={{ left: `${(review + auto) / 2}%` }}>
+              A person decides
+            </span>
+            <span className="mx-lab" style={{ left: `${(auto + 100) / 2}%` }}>
+              Same person
+            </span>
+          </div>
           {p.conflicts.length > 0 && (
             <p className="dq-why is-bad">
               {p.conflicts.join('. ')}. A conflict is never matched automatically, however high the score: a person decides.
@@ -344,7 +362,11 @@ function PairDialog({ id, canDecide, auto, onClose, onDecided }: { id: number; c
                     </td>
                     <td data-label="Result">
                       <Pill tone={RESULT[r.result].tone}>{RESULT[r.result].text}</Pill>
-                      {r.detail && <small className="cu-detail">{r.detail}</small>}
+                      {r.result === 'same' && r.a && r.b && r.a !== r.b && !r.detail ? (
+                        <small className="cu-detail">Equal after cleaning</small>
+                      ) : (
+                        r.detail && <small className="cu-detail">{r.detail}</small>
+                      )}
                     </td>
                     <td data-label="Points" className="num">
                       <b>{r.points}</b>
@@ -355,9 +377,12 @@ function PairDialog({ id, canDecide, auto, onClose, onDecided }: { id: number; c
               <tfoot>
                 <tr>
                   <td colSpan={4}>
-                    <Explain title="Score" text={`Points added up, at most 100. ${auto} or more with no conflict is matched automatically.`} calc={`${p.points!.filter((r) => r.points).map((r) => `${r.label} ${r.points}`).join(' + ')} = ${sum}${sum > 100 ? '\ncapped at 100' : ''}`}>
-                      <b>Score</b>
-                    </Explain>
+                    <b>Score</b>{' '}
+                    <code className="text-sm">
+                      {p.points!.filter((r) => r.points).map((r) => r.points).join(' + ') || '0'} = {sum}
+                      {sum > 100 ? ', capped at 100' : ''} ·{' '}
+                      {p.conflicts.length ? 'conflict, so a person decides' : p.score >= auto ? `${auto} or more, so the same person` : p.score >= review ? `below ${auto}, so a person decides` : `below ${review}, so different people`}
+                    </code>
                   </td>
                   <td className="num">
                     <b>{p.score}</b>

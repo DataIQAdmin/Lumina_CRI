@@ -11,7 +11,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from ingestion.models import FieldMap, RawTable
-from ingestion.rules import judged_rows
+from ingestion.rules import Clock, compile_rule, judged_rows, table_rules, text_of
 from sources.models import Source
 
 from . import normalize
@@ -36,15 +36,18 @@ def build_profiles(source):
     """{customer id: profile} of one source. Every customer with a row in a mapped table gets a profile (all rows
     are scored); its values come only from clean rows. When a customer has several clean rows in a table (two phone
     numbers), the newest one counts. rows: how many of the customer's rows there are and how many are clean;
-    held: fields that have a value only in held-back rows."""
+    held: fields that have a value only in held-back rows. raw: every field with a value, clean or not, and whether
+    it passes its own column rule, for the trust score (silver rows are only read, never changed)."""
     profiles = defaultdict(lambda: {"values": {}, "keys": {}, "tables": {}, "updated_at": None,
-                                    "rows": {"total": 0, "clean": 0}, "held": set()})
+                                    "rows": {"total": 0, "clean": 0}, "held": set(), "raw": {}})
     for name, fields in _mapping(source).items():
         table = RawTable.objects.filter(source=source, name=name).first()
         if table is None or fields.get("customer_id") not in (table.columns or []):
             continue
         at = {f: table.columns.index(c) for f, c in fields.items() if c in table.columns}
-        best, held = {}, defaultdict(set)
+        rules = {c: compile_rule(p) for c, p in table_rules(table).items()}
+        clock = Clock()
+        best, held, fallback = {}, defaultdict(set), {}
         for position, plain, shown, passed in judged_rows(table):
             key = normalize.text(plain[at["customer_id"]])
             if not key:
@@ -56,21 +59,39 @@ def build_profiles(source):
                 p["updated_at"] = when
             if not passed:
                 held[key] |= {f for f, i in at.items() if f not in LINKS and normalize.text(plain[i])}
+                kept = fallback.get(key)
+                if kept is None or (when and (kept[0] is None or _later(when, kept[0]))):
+                    fallback[key] = (when, plain, shown)
                 continue
             p["rows"]["clean"] += 1
             kept = best.get(key)
             if kept is None or (when and (kept[0] is None or _later(when, kept[0]))):
                 best[key] = (when, plain, shown)
+        def note(p, field, i, plain, shown):
+            compiled = rules.get(table.columns[i])
+            fix = normalize.NORMALIZERS.get(field)
+            p["raw"][field] = {"value": normalize.text(shown[i]),
+                               "key": (fix(plain[i]) if fix else normalize.text(plain[i]).lower()) or "",
+                               "tested": compiled is not None,
+                               "passed": compiled is None or clock.matches(compiled, text_of(plain[i])),
+                               "table": table.name}
+
         for key, (when, plain, shown) in best.items():
             p = profiles[key]
             for field, i in at.items():
                 if field in LINKS or not normalize.text(shown[i]):
                     continue
+                note(p, field, i, plain, shown)
                 p["values"][field] = normalize.text(shown[i])
                 p["tables"][field] = table.name
                 clean = normalize.NORMALIZERS.get(field)
                 if clean:
                     p["keys"][field] = clean(plain[i])
+        for key, (when, plain, shown) in fallback.items():
+            p = profiles[key]
+            for field, i in at.items():
+                if field not in LINKS and field not in p["raw"] and normalize.text(shown[i]):
+                    note(p, field, i, plain, shown)
         for key, fields_held in held.items():
             profiles[key]["held"] |= fields_held
     out = {}
@@ -104,7 +125,7 @@ def run(user=""):
         for key, built in build_profiles(source).items():
             Profile.objects.update_or_create(source=source, key=key, defaults={
                 "values": built["values"], "keys": built["keys"], "tables": built["tables"],
-                "updated_at": _aware(built["updated_at"]), "rows": built["rows"], "held": built["held"]})
+                "updated_at": _aware(built["updated_at"]), "rows": built["rows"], "held": built["held"], "raw": built["raw"]})
             seen.add((source.id, key))
     for p in Profile.objects.all():
         if (p.source_id, p.key) not in seen:
@@ -121,6 +142,7 @@ def run(user=""):
         status = decision[0] if decision else status_of(total, conflicts, settings["auto"], settings["review"])
         if status:
             made.append(MatchPair(a=a, b=b, score=total, points=points, conflicts=conflicts, status=status,
+                                  settings_version=settings["version"],
                                   decided_by=decision[1] if decision else "", decided_at=decision[2] if decision else None))
     MatchPair.objects.bulk_create(made)
     regroup()
