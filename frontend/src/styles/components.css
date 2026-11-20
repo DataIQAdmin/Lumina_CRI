@@ -9950,3 +9950,68 @@ td.num .count-button {
   height: 10px;
   border-radius: 3px;
 }
+
+.st-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -4px 0 10px;
+}
+
+.st-presets .btn.is-on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Customers list (customers/TrustTab.tsx) */
+.cu-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.cu-person {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cu-noname {
+  color: var(--text-3);
+  font-weight: 500;
+}
+
+/* Customer golden page header (GoldenPage.tsx) */
+.gd-head {
+  flex-wrap: wrap;
+}
+
+.gd-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.gd-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gd-score .tx-ring {
+  width: 58px;
+  height: 58px;
+}
+
+.gd-score .tx-ring b {
+  font-size: 18px;
+}
+
+@media (max-width: 640px) {
+  .gd-head .page-header-text {
+    flex-basis: calc(100% - 80px);
+  }
+}

@@ -223,3 +223,22 @@ def test_matching_is_checked_against_an_answer_key_that_is_not_stored(admin):
     assert got["found"]["app_only"] == {"right": 1, "expected": 1}
     assert got["wrong_links"] == 0 and got["missing_count"] == 2 and got["misses"] == []
     assert admin.post("/api/match/check/", {"key": "nope"}, format="json").status_code == 400
+
+
+def test_every_customer_has_a_name_and_the_list_sorts_by_name(admin):
+    admin.post("/api/match/run/")
+    meera = Profile.objects.get(key="AXC3")
+    meera.values.pop("name")
+    meera.raw["name"]["passed"] = False  # her name fails its rule: not clean, but still her name
+    meera.save()
+    arjun = Profile.objects.get(key="usr_c")
+    arjun.values.pop("name")
+    arjun.raw.pop("name")
+    arjun.save()
+    got = admin.get("/api/people/").json()["results"]
+    names = {x["name"]: x["name_from"] for x in got}
+    assert names["Meera Nair"] == "raw" and names["Customer usr_c"] == "id"
+    assert [x["name"] for x in got][-1] == "Customer usr_c"  # known only by ID: last
+    assert [x["name"] for x in got[:-1]] == sorted(x["name"] for x in got[:-1])
+    low = admin.get("/api/people/", {"sort": "low"}).json()["results"]
+    assert [x["score"] for x in low] == sorted(x["score"] for x in low)

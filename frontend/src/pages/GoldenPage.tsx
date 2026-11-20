@@ -13,7 +13,7 @@ import { Icon } from '../components/Icon'
 import { Loader } from '../components/Loader'
 import { n, Pill } from '../components/Lx'
 import { useToast } from '../components/Toasts'
-import { ErrorAlert } from '../components/ui'
+import { Avatar, ErrorAlert } from '../components/ui'
 import { formatRelative } from '../format'
 
 const HOW =
@@ -69,49 +69,53 @@ export function GoldenPage() {
       <nav className="dq-trail" aria-label="You are here">
         <Link to="/customers">Customers</Link>
         <Icon name="chevron-right" size={13} />
-        <b>{p.name || p.person}</b>
+        <b>{p.name}</b>
       </nav>
       <header className="page-header gd-head">
-        <div className={`tr-big is-${BAND_TONE[p.band] ?? 'plain'}`}>
-          <b>{p.score ?? '—'}</b>
-          <span>{p.band}</span>
-        </div>
+        <Avatar name={p.name_from === 'id' ? '#' : p.name} large />
         <div className="page-header-text">
-          <h1>{p.name || 'No name'}</h1>
-          <p>
-            {p.person} · found in {p.records.length} record{p.records.length === 1 ? '' : 's'} ·{' '}
-            {p.approval ? (
-              p.approval.current ? (
-                <span className="is-good-text">
-                  Approved by {p.approval.by} {formatRelative(p.approval.at)}
-                </span>
-              ) : (
-                <span className="is-bad-text">Changed since {p.approval.by} approved it</span>
-              )
+          <h1>{p.name}</h1>
+          <p className="gd-status">
+            {p.approval?.current ? (
+              <Pill tone="ok">Approved by {p.approval.by} {formatRelative(p.approval.at)}</Pill>
+            ) : p.approval ? (
+              <Pill tone="warn">Changed since {p.approval.by} approved it</Pill>
             ) : (
-              'Proposed, not approved yet'
+              <Pill tone="plain">Proposed</Pill>
             )}
+            <span className="muted text-sm">
+              Found in {p.records.length} system record{p.records.length === 1 ? '' : 's'}
+              {p.name_from === 'raw' && ' · the name fails its rule in every system'}
+              {p.name_from === 'id' && ' · no system holds a name'}
+            </span>
           </p>
         </div>
-        {p.can_decide && (
-          <div className="row">
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={busy || conflicts.length > 0 || !!p.approval?.current}
-              title={conflicts.length ? 'Settle the differing details first' : undefined}
-              onClick={approve}
-            >
-              <Icon name="check" size={15} /> {p.approval?.current ? 'Approved' : 'Approve'}
-            </button>
+        <div className="gd-score">
+          <div className={`tx-ring is-${BAND_TONE[p.band] ?? 'plain'}`} style={{ ['--v' as string]: p.score ?? 0 }}>
+            <b>{p.score ?? '—'}</b>
           </div>
+          <span className="cu-side">
+            <b>{p.band || 'Not scored'}</b>
+            <small>trust score</small>
+          </span>
+        </div>
+        {p.can_decide && (
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={busy || conflicts.length > 0 || !!p.approval?.current}
+            title={conflicts.length ? 'Settle the differing details first' : undefined}
+            onClick={approve}
+          >
+            <Icon name="check" size={15} /> {p.approval?.current ? 'Approved' : 'Approve'}
+          </button>
         )}
       </header>
 
       {(p.holds.length > 0 || conflicts.length > 0) && (
         <p className="dq-why is-bad">
-          {[...p.holds, ...conflicts.map((c) => `${c.label} differs between sources`)].join('. ')}. A person must settle this: keep a record apart, or fix
-          the value at its source.
+          <b>Needs review.</b> {[...p.holds, ...conflicts.map((c) => `${c.label} differs between sources`)].join('. ')}. Settle it by keeping a record
+          apart, or by fixing the value at its source.
         </p>
       )}
 
