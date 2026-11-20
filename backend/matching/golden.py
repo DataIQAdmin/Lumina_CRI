@@ -7,6 +7,9 @@ How a value is chosen:
   Mobile, email                               most recent: the record updated last that has it
   Address, city, state, pincode               most recent, and all four from the same record, so an address is
                                               never stitched together from two places
+Only clean (silver) values take part: a value failing its column rule never reaches the golden record. When two
+records of the same source tie, the one with the higher trust score wins. Each field also says how many of the
+records holding it agree with the chosen value ("2 of 3 agree").
 Two values that are the same once cleaned up ("12/05/1990" and "12-05-1990") agree. A PAN, Aadhaar or date of
 birth that differs is a conflict: the golden record shows the chosen value but a person must confirm it.
 """
@@ -49,7 +52,7 @@ def build(records, settings=None):
     rules = {**{f: rule for f, _, rule in FIELDS}, **{f: ("address" if f == "address" and r == "recent" else r)
                                                       for f, r in (settings.get("field_rules") or {}).items()}}
     by_priority = sorted(records, key=lambda r: (order.index(r.source.code) if getattr(r.source, "code", None) in order else len(order),
-                                                 -float(r.source.trust), r.source.name,
+                                                 -float(r.source.trust), r.source.name, -(getattr(r, "trust", None) or 0),
                                                  -(r.updated_at.timestamp() if r.updated_at else 0)))
     rank = {r.id: i for i, r in enumerate(by_priority)}
     with_address = [r for r in records if r.values.get("address")] or [r for r in records if any(r.values.get(f) for f in ADDRESS)]
@@ -61,7 +64,7 @@ def build(records, settings=None):
             rule = "address-order"
         having = [r for r in records if r.values.get(field)]
         row = {"field": field, "label": label, "rule": RULE_TEXT[rule], "value": "", "record": None, "why": "",
-               "conflict": False, "others": []}
+               "conflict": False, "others": [], "agree": [0, 0]}
         if not having:
             row["why"] = "Missing in every source"
             out.append(row)
@@ -102,9 +105,18 @@ def build(records, settings=None):
             else:
                 note = f"Not chosen: older ({_when(r)})" if r.updated_at else "Not chosen: no last-updated date"
             row["others"].append({"record": r, "value": value, "why": note, "same": bool(same)})
-        row.update(value=chosen.values[field], record=chosen, why=why)
+        row.update(value=chosen.values[field], record=chosen, why=why,
+                   agree=[1 + sum(o["same"] for o in row["others"]), len(having)])
         out.append(row)
     return out
+
+
+def snapshot(rows):
+    """The golden record as saved: records become {id, source, key, trust, updated_at} so it is plain JSON."""
+    side = lambda r: {"id": r.id, "source": r.source.name, "key": r.key, "trust": getattr(r, "trust", None),  # noqa: E731
+                      "updated_at": r.updated_at.isoformat() if r.updated_at else None} if r else None
+    return [{**x, "record": side(x["record"]), "others": [{**o, "record": side(o["record"])} for o in x["others"]]}
+            for x in rows]
 
 
 def fingerprint(rows):

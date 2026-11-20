@@ -49,3 +49,14 @@ def test_one_record_is_its_own_golden_record():
     got = rows(record(1, APP, None, name="Arjun Rao", mobile="9000000001"))
     assert got["name"]["why"] == "Only Mobile app has it" and got["mobile"]["value"] == "9000000001"
     assert golden.fingerprint(golden.build([record(1, APP, None, name="Arjun Rao")])).startswith("name=Arjun Rao")
+
+
+def test_each_field_says_how_many_records_agree_and_saves_as_plain_json():
+    core = record(1, CORE, (2024, 1, 10), name="Rohan Kumar", mobile="9876543210")
+    app = record(2, APP, (2026, 11, 1), name="Rohan K", mobile="+919876543210")
+    other = record(3, APP, (2025, 1, 1), name="Rohan Kumar")
+    got = rows(core, app, other)
+    assert got["name"]["agree"] == [2, 3] and got["mobile"]["agree"] == [2, 2]
+    saved = {r["field"]: r for r in golden.snapshot(golden.build([core, app, other]))}
+    assert saved["name"]["record"]["key"] == "K1" and saved["mobile"]["record"]["updated_at"].startswith("2026-11-01")
+    assert golden.fingerprint(saved.values()) == golden.fingerprint(golden.build([core, app, other]))

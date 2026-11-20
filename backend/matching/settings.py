@@ -31,13 +31,15 @@ def current():
     """The settings in force: the saved ones over the defaults."""
     from .models import MatchSettings
 
-    saved = MatchSettings.objects.filter(pk=1).values_list("values", flat=True).first() or {}
+    row = MatchSettings.objects.filter(pk=1).values("values", "version").first() or {"values": {}, "version": 0}
+    saved = row["values"] or {}
     out = deepcopy(DEFAULTS)
     for key, value in saved.items():
         if isinstance(out.get(key), dict) and isinstance(value, dict):
             out[key].update(value)
         elif key in out:
             out[key] = value
+    out["version"] = row["version"]  # which settings a score was worked out with; never saved inside values
     return out
 
 

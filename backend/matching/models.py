@@ -20,12 +20,16 @@ class Profile(models.Model):
     person = models.CharField(max_length=20, blank=True, db_index=True)  # the group it belongs to, e.g. "P-12"
     rows = models.JSONField(default=dict)  # {"total": 3, "clean": 2}: the customer's rows in mapped tables
     held = models.JSONField(default=list)  # fields with a value only in held-back rows, e.g. ["pan"]
+    # Every field the source holds for this customer, clean or not, for the trust score only (the golden record uses
+    # clean values only): {"name": {"value": "Rahul S", "key": "rahul s", "tested": true, "passed": false}}.
+    raw = models.JSONField(default=dict)
     # Trust score (matching/trust.py): 0-100 from the five rules, its band, each rule's score and why, and what
     # keeps the band at Review whatever the score.
     trust = models.PositiveSmallIntegerField(null=True, blank=True)
     band = models.CharField(max_length=10, blank=True)
     parts = models.JSONField(default=dict)
     holds = models.JSONField(default=list)
+    settings_version = models.PositiveIntegerField(default=0)  # the settings the score was worked out with
     built_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -52,6 +56,7 @@ class MatchPair(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES)
     decided_by = models.CharField(max_length=150, blank=True)
     decided_at = models.DateTimeField(null=True, blank=True)
+    settings_version = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = ["-score"]
@@ -72,6 +77,16 @@ class MatchRun(models.Model):
         ordering = ["-ran_at"]
 
 
+class GoldenRecord(models.Model):
+    """A person's golden record as worked out after the last matching run or decision, saved with the evidence for
+    every field, so the screen shows exactly what was decided and never works it out again."""
+
+    person = models.CharField(max_length=20, unique=True)
+    rows = models.JSONField(default=list)  # matching/golden.py snapshot(): one entry per field
+    settings_version = models.PositiveIntegerField(default=0)
+    built_at = models.DateTimeField(auto_now=True)
+
+
 class GoldenApproval(models.Model):
     """Someone approved a person's golden record as it stood. It stays approved only while the record says the same
     thing (fingerprint); a change after matching again shows as changed since approval."""
@@ -86,5 +101,6 @@ class MatchSettings(models.Model):
     """The one row of this organization's matching, trust and golden record settings (matching/settings.py)."""
 
     values = models.JSONField(default=dict)
+    version = models.PositiveIntegerField(default=0)  # goes up by one on every save
     updated_by = models.CharField(max_length=150, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
