@@ -875,6 +875,26 @@ export interface MatchSettingsValues {
   field_rules: Record<string, 'order' | 'recent'>
 }
 
+// What saving these settings would change (POST /settings/matching/preview/); nothing is saved.
+export interface SettingsPreview {
+  records: number
+  band_changes: number
+  moves: Record<string, number>
+  average: { before: number | null; after: number | null }
+  people: { before: number; after: number }
+  pair_changes: number
+  golden_changes: number
+}
+
+// Matching compared with an answer key kept outside Lumina (POST /match/check/).
+export interface AnswerCheck {
+  found: Record<'shared' | 'twice' | 'conflicts' | 'app_only', { right: number; expected: number }>
+  wrong_links: number
+  missing: string[]
+  missing_count: number
+  misses: { person: string; keys: string[]; what: string }[]
+}
+
 export interface MatchSettingsInfo {
   settings: MatchSettingsValues
   defaults: MatchSettingsValues

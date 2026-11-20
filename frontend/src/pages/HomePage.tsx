@@ -4,12 +4,19 @@ import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import type { AuditEvent } from '../api/types'
 import { useApi } from '../api/useApi'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth, useCan } from '../auth/AuthContext'
 import { Explain } from '../components/Explain'
 import { Icon, type IconName } from '../components/Icon'
 import { formatRelative } from '../format'
 
 const n = (v: number) => v.toLocaleString('en-IN')
+
+const HOME_BANDS = [
+  { band: 'High', label: 'High', range: '90–100', tone: 'good' },
+  { band: 'Good', label: 'Good', range: '75–89', tone: 'ok' },
+  { band: 'Review', label: 'Review', range: '50–74', tone: 'warn' },
+  { band: 'Low', label: 'Low', range: 'below 50', tone: 'bad' },
+] as const
 
 type Attention = { icon: IconName; tone: 'bad' | 'warn' | 'acc'; title: string; detail: string; action: string; to: string }
 
@@ -24,6 +31,9 @@ export function HomePage() {
   const counts = useApi(() => api.pipeline(), [])
   const sources = useApi(() => api.sources(), [])
   const activity = useApi(() => api.audit({}), [])
+  const canMatch = useCan('view_matches')
+  const match = useApi(() => (canMatch ? api.match() : Promise.resolve(null)), [canMatch])
+  const people = useApi(() => (canMatch ? api.people('', '', 1) : Promise.resolve(null)), [canMatch])
   const [attention, setAttention] = useState<Attention[] | null>(null)
 
   // Tables that need a look, most problems first, plus systems that cannot connect.
@@ -61,13 +71,24 @@ export function HomePage() {
     { done: all.length > 0, title: 'Connect a source', detail: sources.data ? `${n(all.length)} connected` : '…', action: 'Add another', to: '/sources' },
     { done: (c?.tables ?? 0) > 0, title: 'Profile source data', detail: c ? `${n(c.tables)} tables checked` : '…', action: 'Open profiling', to: '/profiling' },
     { done: (c?.rules ?? 0) > 0, title: 'Apply quality rules', detail: c ? `${n(c.rules)} format rule${c.rules === 1 ? '' : 's'}` : '…', action: 'Manage rules', to: '/rules' },
-    { done: false, title: 'Customers and golden records', detail: 'Under development', action: 'View status', to: '/customers' },
+    {
+      done: (match.data?.summary.people ?? 0) > 0,
+      title: 'Match customers',
+      detail: match.data ? (match.data.summary.people ? `${n(match.data.summary.people)} customers found` : 'Map fields, then run matching') : '…',
+      action: 'Open customers',
+      to: '/customers',
+    },
   ]
   const next = steps.findIndex((s) => !s.done)
   const items: Attention[] = [
     ...off.map((s) => ({ icon: 'connectors' as IconName, tone: 'bad' as const, title: `${s.name} is switched off`, detail: 'Lumina is not reading it', action: 'Open', to: `/connectors/${s.code}` })),
+    ...(match.data && match.data.summary.review + match.data.summary.conflicts > 0
+      ? [{ icon: 'merge' as IconName, tone: 'warn' as const, title: `${n(match.data.summary.review + match.data.summary.conflicts)} possible matches wait for a decision`, detail: match.data.summary.conflicts ? `${n(match.data.summary.conflicts)} with differing PAN, Aadhaar or date of birth` : 'Same person or not?', action: 'Review', to: '/customers?tab=match' }]
+      : []),
     ...(attention ?? []),
   ]
+  const bands = people.data?.bands
+  const scored = bands ? Object.values(bands).reduce((a, x) => a + x, 0) : 0
   const first = (user?.name ?? '').split(' ')[0]
 
   return (
@@ -139,6 +160,33 @@ export function HomePage() {
           <span className="muted text-sm">Rows that pass all table rules</span>
         </div>
       </div>
+
+      {canMatch && scored > 0 && bands && (
+        <section className="card">
+          <div className="hm-h">
+            <h2>
+              <Explain title="Customer trust" text="Every customer gets a trust score from five checks: uniqueness, recency, completeness, consistency and accuracy. Open a customer and press Why? to see how.">
+                Customer trust
+              </Explain>
+            </h2>
+            <Link to="/customers" className="link text-sm">
+              See all {n(scored)} customers →
+            </Link>
+          </div>
+          <div className="hm-trust" role="img" aria-label={HOME_BANDS.map((b) => `${b.band} ${bands[b.band] ?? 0}`).join(', ')}>
+            {HOME_BANDS.map((b) => (bands[b.band] ? <i key={b.band} className={`is-${b.tone}`} style={{ flexGrow: bands[b.band] }} /> : null))}
+          </div>
+          <div className="hm-trust-legend">
+            {HOME_BANDS.map((b) => (
+              <Link key={b.band} to="/customers" className={`hm-trust-key is-${b.tone}`}>
+                <i />
+                <b>{n(bands[b.band] ?? 0)}</b> {b.label}
+                <small className="muted">{b.range}</small>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="hm-grid">
         <section className="card">

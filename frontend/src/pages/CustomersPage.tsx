@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 
 import { api } from '../api/client'
-import type { MatchPairRow, MatchPoint } from '../api/types'
+import type { AnswerCheck, MatchPairRow, MatchPoint } from '../api/types'
 import { useApi } from '../api/useApi'
 import { useCan } from '../auth/AuthContext'
 import { TrustTab } from '../components/customers/TrustTab'
@@ -246,6 +246,7 @@ export function CustomersPage() {
             )}
             <Pager page={page} pages={pages} onPage={setPage} text={pairs.data ? `${n(pairs.data.count)} pairs` : ''} />
           </section>
+          {d.can_run && <AnswerKeyCard />}
         </>
       )}
       {open !== null && <PairDialog id={open} canDecide={d.can_decide} auto={d.auto} review={d.review} onClose={() => setOpen(null)} onDecided={refresh} />}
@@ -395,5 +396,79 @@ function PairDialog({ id, canDecide, auto, review, onClose, onDecided }: { id: n
         </>
       )}
     </Dialog>
+  )
+}
+
+
+// Proof: compare who matching linked with an answer key kept outside Lumina (the demo data's). The file is only read.
+function AnswerKeyCard() {
+  const [result, setResult] = useState<AnswerCheck | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const pick = async (file: File | undefined) => {
+    if (!file) return
+    setBusy(true)
+    setError(null)
+    try {
+      setResult(await api.matchCheck(JSON.parse(await file.text())))
+    } catch (e) {
+      setError(e instanceof SyntaxError ? 'This file is not valid JSON.' : (e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const tiles: { key: keyof AnswerCheck['found']; label: string; good: string }[] = [
+    { key: 'shared', label: 'Same customer in both systems', good: 'linked' },
+    { key: 'twice', label: 'Registered twice in the app', good: 'linked' },
+    { key: 'conflicts', label: 'PAN or date of birth differs', good: 'held for a person' },
+    { key: 'app_only', label: 'Only in the app', good: 'kept on their own' },
+  ]
+  return (
+    <section className="card">
+      <div className="hm-h">
+        <div>
+          <h2>Check matching against an answer key</h2>
+          <span className="muted text-sm">Upload the answer key JSON kept outside Lumina. It is only read, never saved.</span>
+        </div>
+        <label className="btn">
+          <Icon name="file" size={15} /> {busy ? 'Checking…' : 'Choose answer key'}
+          <input type="file" accept=".json,application/json" hidden disabled={busy} onChange={(e) => pick(e.target.files?.[0])} />
+        </label>
+      </div>
+      {error && <ErrorAlert message={error} />}
+      {result && (
+        <>
+          <div className="hm-stats">
+            {tiles.map((t) => {
+              const f = result.found[t.key]
+              return (
+                <div key={t.key} className="card hm-stat">
+                  <span className="muted">{t.label}</span>
+                  <b className={f.right === f.expected ? 'is-good-text' : 'is-bad-text'}>
+                    {n(f.right)} of {n(f.expected)}
+                  </b>
+                  <span className="muted text-sm">{t.good}</span>
+                </div>
+              )
+            })}
+          </div>
+          <p className={`dq-why ${result.wrong_links ? 'is-bad' : 'is-good'}`}>
+            {result.wrong_links === 0 ? 'No wrong links: matching never joined two different customers.' : `${n(result.wrong_links)} people join records of different customers.`}
+            {result.missing_count > 0 && ` ${n(result.missing_count)} records in the key are not loaded in Lumina and were skipped.`}
+          </p>
+          {result.misses.length > 0 && (
+            <ul className="st-moves">
+              {result.misses.map((m) => (
+                <li key={m.person}>
+                  <span>
+                    {m.keys.join(' · ')} <small className="muted">{m.what}</small>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </section>
   )
 }

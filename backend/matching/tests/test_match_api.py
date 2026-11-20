@@ -193,3 +193,33 @@ def test_bad_settings_are_refused(admin):
     steward = client("set.steward", group="Data steward")
     assert steward.get("/api/settings/matching/").json()["can_edit"] is False
     assert steward.put("/api/settings/matching/", settings_body(admin), format="json").status_code == 403
+
+
+def test_a_settings_preview_says_what_would_change_and_saves_nothing(admin):
+    from matching.models import MatchSettings
+
+    admin.post("/api/match/run/")
+    before = {p.key: p.band for p in Profile.objects.all()}
+    body = settings_body(admin, weights={"uniqueness": 0, "recency": 100, "completeness": 0, "consistency": 0, "accuracy": 0})
+    got = admin.post("/api/settings/matching/preview/", body, format="json")
+    assert got.status_code == 200, got.json()
+    got = got.json()
+    assert got["records"] == 6 and got["band_changes"] > 0 and got["average"]["before"] != got["average"]["after"]
+    assert {p.key: p.band for p in Profile.objects.all()} == before  # nothing changed
+    assert not MatchSettings.objects.exists()
+    steward = client("preview.steward", group="Data steward")
+    assert steward.post("/api/settings/matching/preview/", body, format="json").status_code == 403
+
+
+def test_matching_is_checked_against_an_answer_key_that_is_not_stored(admin):
+    admin.post("/api/match/run/")
+    key = [{"person": "P1", "core": "AXC1", "app": ["usr_a"], "conflict": None},
+           {"person": "P2", "core": "AXC2", "app": ["usr_b"], "conflict": "dob"},
+           {"person": "P3", "core": None, "app": ["usr_c"], "conflict": None},
+           {"person": "P4", "core": "AXC9", "app": ["usr_z"], "conflict": None}]
+    got = admin.post("/api/match/check/", {"key": key}, format="json").json()
+    assert got["found"]["shared"] == {"right": 1, "expected": 1}
+    assert got["found"]["conflicts"] == {"right": 1, "expected": 1}  # waits for a person, not linked
+    assert got["found"]["app_only"] == {"right": 1, "expected": 1}
+    assert got["wrong_links"] == 0 and got["missing_count"] == 2 and got["misses"] == []
+    assert admin.post("/api/match/check/", {"key": "nope"}, format="json").status_code == 400

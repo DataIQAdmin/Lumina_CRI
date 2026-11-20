@@ -9881,3 +9881,72 @@ td.num .count-button {
   white-space: nowrap;
   transform: translateX(-50%);
 }
+
+/* Settings impact preview (settings/MatchSettings.tsx) */
+.st-impact .hm-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.st-moves {
+  display: grid;
+  gap: 4px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.st-moves li {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-size: 13px;
+}
+
+.dq-why.is-good {
+  border-color: var(--good-dot);
+  background: var(--good-bg);
+  color: var(--good-text);
+}
+
+/* Home: customer trust bands (HomePage.tsx) */
+.hm-trust {
+  display: flex;
+  gap: 3px;
+  height: 14px;
+  margin: 4px 0 12px;
+  overflow: hidden;
+  border-radius: 7px;
+}
+
+.hm-trust i {
+  display: block;
+  min-width: 6px;
+}
+
+.hm-trust i.is-good, .hm-trust-key.is-good i { background: var(--good-dot); }
+.hm-trust i.is-ok, .hm-trust-key.is-ok i { background: #7cc79f; }
+.hm-trust i.is-warn, .hm-trust-key.is-warn i { background: var(--warn-dot); }
+.hm-trust i.is-bad, .hm-trust-key.is-bad i { background: var(--bad-dot); }
+
+.hm-trust-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+
+.hm-trust-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.hm-trust-key i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
