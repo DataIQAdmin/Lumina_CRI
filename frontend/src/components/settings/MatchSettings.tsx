@@ -28,6 +28,7 @@ export function MatchSettings() {
   const [draft, setDraft] = useState<MatchSettingsValues | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [preview, setPreview] = useState<SettingsPreview | null>(null)
 
   if (data.error) return <ErrorAlert message={data.error} />
   if (!data.data) return <Loader kind="scan" label="Loading settings" />
@@ -51,7 +52,6 @@ export function MatchSettings() {
   const num = (v: string) => (v === '' ? 0 : Math.max(0, Math.round(Number(v)) || 0))
   const nameOf = (code: string) => d.sources.find((x) => x.code === code)?.name ?? code
 
-  const [preview, setPreview] = useState<SettingsPreview | null>(null)
   const check = async () => {
     setBusy(true)
     setError(null)
