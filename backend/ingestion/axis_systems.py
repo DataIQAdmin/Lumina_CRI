@@ -368,7 +368,7 @@ class AxisBank:
                 ("short_name", "varchar(20)"), ("address_line1", "varchar(105)"), ("address_line2", "varchar(105)"),
                 ("address_line3", "varchar(105)"), ("address_line4", "varchar(105)"), ("pincode", "varchar(10)"),
                 ("country", "char(2)"), ("nationality", "char(2)"), ("language", "char(3)"), ("local_branch", "char(3)"),
-                ("customer_category", "varchar(10)"), ("unique_id_name", "varchar(20)"), ("unique_id_value", "varchar(20)"),
+                ("customer_category", "varchar(10)"), ("pan_no", "varchar(10)"),
                 ("frozen", "char(1)"), ("deceased", "char(1)"), ("whereabouts_unknown", "char(1)"),
                 ("cif_creation_date", "date"), ("record_stat", "char(1)"), ("auth_stat", "char(1)"), ("mod_no", "integer"),
                 ("maker_id", "varchar(12)"), ("maker_dt_stamp", "timestamp"), ("checker_id", "varchar(12)"),
@@ -381,9 +381,10 @@ class AxisBank:
                 ("e_mail", "varchar(100)"), ("resident_status", "char(1)"), ("passport_no", "varchar(15)"),
                 ("occupation", "varchar(30)"), ("employer_name", "varchar(70)"), ("annual_income", "numeric(15,2)")]),
             "sttm_cust_kyc": Table([
-                ("customer_no", "varchar(9)"), ("document_type", "varchar(10)"), ("document_no", "varchar(20)"),
-                ("verified", "char(1)"), ("verified_date", "date"), ("ckyc_number", "varchar(14)"),
-                ("risk_category", "varchar(6)"), ("next_review_date", "date")]),
+                ("customer_no", "varchar(9) PRIMARY KEY"), ("pan_no", "varchar(10)"), ("pan_verified", "char(1)"),
+                ("aadhaar_no", "varchar(12)"), ("aadhaar_verified", "char(1)"), ("ckyc_number", "varchar(14)"),
+                ("kyc_mode", "varchar(10)"), ("kyc_verified_date", "date"), ("risk_category", "varchar(6)"),
+                ("next_review_date", "date")]),
             "sttm_cust_account": Table([
                 ("cust_ac_no", "varchar(15) PRIMARY KEY"), ("branch_code", "char(3)"), ("cust_no", "varchar(9)"),
                 ("ccy", "char(3)"), ("account_class", "varchar(6)"), ("ac_desc", "varchar(60)"), ("ac_open_date", "date"),
@@ -468,7 +469,7 @@ class AxisBank:
                 short = (p.first[0] + " " + p.last).upper()[:20]
                 T["sttm_customer"].rows.append([
                     cif, "I", p.name.upper(), short, p.address1, p.address2, p.locality[0], f"{p.city[0]}, {p.city[1]}",
-                    p.locality[1], "IN", "IN", "ENG", branch_city[3], category, "PAN", pan, "N", "N", "N", created, "O", auth,
+                    p.locality[1], "IN", "IN", "ENG", branch_city[3], category, pan, "N", "N", "N", created, "O", auth,
                     rng.randint(1, 6), maker, made, None if auth == "U" else maker.replace("MK", "CK"),
                     None if auth == "U" else made + timedelta(minutes=rng.randint(5, 240))])
                 T["sttm_cust_personal"].rows.append([
@@ -479,10 +480,9 @@ class AxisBank:
                 verified = created + timedelta(days=rng.randint(0, 3))
                 risk = _weighted(rng, [("LOW", 78), ("MEDIUM", 18), ("HIGH", 4)])
                 review = _years(verified, {"LOW": 10, "MEDIUM": 8, "HIGH": 2}[risk])
-                T["sttm_cust_kyc"].rows += [
-                    [cif, "PAN", pan, "Y", verified, p.ckyc, risk, review],
-                    [cif, "AADHAAR", p.aadhaar, "Y", verified, p.ckyc, risk, review],
-                ]
+                T["sttm_cust_kyc"].rows.append([cif, pan, "Y", p.aadhaar, "Y", p.ckyc,
+                                                _weighted(rng, [("OFFLINE", 45), ("EKYC", 35), ("VIDEO_KYC", 20)]),
+                                                verified, risk, review])
                 if copy == 1:
                     continue  # the second CIF has KYC but its accounts were never opened
                 # Accounts: a savings account for nearly everyone, a current account for businesses.
@@ -791,7 +791,7 @@ class AxisBank:
         n = len(everyone)
         pick = lambda k: set(rng.sample(range(n), k))  # noqa: E731
         no_rel = pick(round(VX_SHARED * 0.3))
-        dmy, dmonth = pick(round(n * 0.3)), pick(round(n * 0.1))
+        dmy, dmonth = pick(round(n * 0.08)), pick(round(n * 0.04))
         upper_email, plus_mobile, dash_mobile = pick(round(n * 0.05)), pick(round(n * 0.4)), pick(round(n * 0.15))
         no_pan, reapplied = pick(round(n * 0.02)), pick(4)
         conflict_pan = {rng.choice([k for k, (_, b) in enumerate(everyone) if b and k not in no_pan])}
@@ -808,8 +808,10 @@ class AxisBank:
                 dob = p.dob
                 if i in dmy:
                     dob_text = dob.strftime("%d/%m/%Y")
+                    self.note("VX: date of birth written DD/MM/YYYY")
                 elif i in dmonth:
                     dob_text = dob.strftime("%d-%b-%Y").upper()
+                    self.note("VX: date of birth written DD-MON-YYYY")
                 else:
                     dob_text = dob.isoformat()
                 mobile = p.mobile

@@ -39,11 +39,10 @@ def test_sizes_and_people_across_systems(data):
 
 def test_identity_numbers_follow_the_real_formats(data):
     flexcube = data[0]
-    pans = col(flexcube["sttm_customer"], "unique_id_value")
+    pans = col(flexcube["sttm_customer"], "pan_no")
     good = [p for p in pans if re.fullmatch(r"[A-Z]{3}P[A-Z][0-9]{4}[A-Z]", p)]
     assert len(pans) - len(good) == data[3]["issues"]["FLEXCUBE: PAN typed wrongly (letter for digit or digit for letter)"]
-    kyc = flexcube["sttm_cust_kyc"]
-    aadhaar = [n for t, n in zip(col(kyc, "document_type"), col(kyc, "document_no")) if t == "AADHAAR"]
+    aadhaar = col(flexcube["sttm_cust_kyc"], "aadhaar_no")
     assert all(re.fullmatch(r"[2-9][0-9]{11}", a) and ax.verhoeff_valid(a) for a in aadhaar)
     assert all(re.fullmatch(r"9[0-9]{14}", a) for a in col(flexcube["sttm_cust_account"], "cust_ac_no"))
     assert all(re.fullmatch(r"UTIB0[0-9]{6}", i) for i in col(flexcube["sttm_cust_account"], "ifsc_code"))

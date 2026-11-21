@@ -10015,3 +10015,20 @@ td.num .count-button {
     flex-basis: calc(100% - 80px);
   }
 }
+
+/* Rules page: recommended rules for Axis demo systems (DataQualityPage.tsx) */
+.dq-recommend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.dq-recommend .hm-grow {
+  min-width: 220px;
+}
