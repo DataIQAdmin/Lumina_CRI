@@ -11,7 +11,6 @@ import { WorkStep } from '../components/dq/WorkStep'
 import { Icon } from '../components/Icon'
 import { Loader } from '../components/Loader'
 import { n, Pill } from '../components/Lx'
-import { useToast } from '../components/Toasts'
 import { EmptyState, ErrorAlert } from '../components/ui'
 import { profileJob } from '../profileJob'
 
@@ -204,50 +203,6 @@ function SourceCard({ source, info, stage, canManage, onOpen }: { source: RawSou
   )
 }
 
-// Ready-made rules for every column of Axis Bank's FLEXCUBE, FINONE and VX tables, applied in one go. Shown only
-// when this connector has tables that have them; each rule can still be changed or removed afterwards.
-function RecommendedRules({ code, name, onApplied }: { code: string; name: string; onApplied: () => void }) {
-  const toast = useToast()
-  const info = useApi(() => api.rulesRecommended(code), [code])
-  const [busy, setBusy] = useState(false)
-  const d = info.data
-  if (!d || d.total === 0) return null
-  const done = d.already === d.total
-  const apply = async () => {
-    setBusy(true)
-    try {
-      const got = await api.applyRecommendedRules(code)
-      toast('success', `${got.applied} rules applied to ${got.tables} tables of ${name}.`)
-      info.reload()
-      onApplied()
-    } catch (e) {
-      toast('error', (e as Error).message)
-    } finally {
-      setBusy(false)
-    }
-  }
-  return (
-    <div className="dq-recommend">
-      <span className="hm-ic is-acc">
-        <Icon name="sliders" size={16} />
-      </span>
-      <div className="hm-grow">
-        <b>{done ? 'Recommended rules applied' : `Recommended rules for ${d.tables.length} table${d.tables.length === 1 ? '' : 's'}`}</b>
-        <span className="muted text-sm">
-          {done
-            ? `All ${d.total} rules are in place. Change any of them per table below.`
-            : `A format rule for each of ${d.total} columns (PAN, Aadhaar, mobile, email, IFSC, dates, amounts and codes).${d.already ? ` ${d.already} are already applied.` : ''} You can change any of them afterwards.`}
-        </span>
-      </div>
-      {!done && (
-        <button type="button" className="btn btn-primary" disabled={busy} onClick={apply}>
-          {busy ? 'Applying…' : 'Apply recommended rules'}
-        </button>
-      )}
-    </div>
-  )
-}
-
 function ConnectorWorkspace({ source, stage, canManage, onSelectTables, onOpenTable }: {
   source: RawSource
   stage: Stage
@@ -283,7 +238,6 @@ function ConnectorWorkspace({ source, stage, canManage, onSelectTables, onOpenTa
             <button type="button" className="btn btn-primary" disabled={!canManage} onClick={onSelectTables}>{action} <Icon name="chevron-right" size={15} /></button>
           )}
         </div>
-        {stage === 'rules' && canManage && <RecommendedRules code={source.code} name={source.name} onApplied={silver.reload} />}
         {stage !== 'profiling' && !canManage && <p className="dq-access-note">Ask a data steward or administrator to view rule and silver status for this connector.</p>}
         {raw.error && <ErrorAlert message={raw.error} />}
         {silver.error && <ErrorAlert message={silver.error} />}

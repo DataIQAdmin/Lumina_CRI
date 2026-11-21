@@ -263,9 +263,6 @@ export const api = {
     post<RulePreview>(`/rules/${code}/preview/`, { table, column, pattern }),
   ruleApply: (code: string, table: string, column: string, pattern: string) =>
     post<{ passed: number; failed: number; total: number }>(`/rules/${code}/`, { table, column, pattern }),
-  rulesRecommended: (code: string) =>
-    get<{ tables: { table: string; rules: number; already: number }[]; total: number; already: number }>(`/rules/${code}/recommended/`),
-  applyRecommendedRules: (code: string) => post<{ applied: number; tables: number }>(`/rules/${code}/recommended/`),
   ruleRemove: (code: string, table: string, column: string) =>
     post<{ removed: number }>(`/rules/${code}/remove/`, { table, column }),
   regexGenerate: (wish: string, history: { role: 'user' | 'assistant'; text: string; regex?: string }[] = []) =>
