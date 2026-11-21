@@ -14,6 +14,7 @@ from rest_framework.response import Response
 
 from audit.models import AuditEvent
 from audit.services import record
+from ingestion.axis_rules import recommended as recommended_rules
 from ingestion.models import ColumnRule, RawTable, SavedRegex
 from ingestion.regex_ai import AiError
 from ingestion.regex_ai import generate as ai_generate
@@ -299,3 +300,31 @@ def pipeline(request):
             pass
     return Response({"connectors": Source.objects.filter(connector_type__in=readable).count(),
                      "tables": RawTable.objects.count(), "rules": ColumnRule.objects.count(), "silver": silver})
+
+
+@api_view(["GET", "POST"])
+@permission_classes(RULES)
+def recommended(request, code):
+    """GET /api/rules/<code>/recommended/  The ready-made rules this connector's tables can take (Axis Bank's
+    FLEXCUBE, FINONE and VX demo systems), per table. POST applies all of them, replacing those columns' rules."""
+    tables = RawTable.objects.filter(source__code=code).select_related("source").order_by("name")
+    found = recommended_rules(tables)
+    if request.method == "GET":
+        out = []
+        for table, rules in found:
+            applied = table_rules(table)
+            out.append({"table": table.name, "rules": len(rules),
+                        "already": sum(1 for c, p in rules.items() if applied.get(c) == p)})
+        return Response({"tables": out, "total": sum(t["rules"] for t in out),
+                         "already": sum(t["already"] for t in out)})
+    applied = 0
+    for table, rules in found:
+        for column, pattern in rules.items():
+            compile_rule(pattern)
+            ColumnRule.objects.update_or_create(source=table.source, table=table.name, column=column,
+                                                defaults={"pattern": pattern, "applied_by": request.user.username})
+            applied += 1
+    if applied:
+        record(request, AuditEvent.CONNECTOR_CHANGED, target=f"source {code}", recommended_rules=applied,
+               tables=len(found))
+    return Response({"applied": applied, "tables": len(found)})
