@@ -119,11 +119,58 @@ export function ConnectorSetupPage() {
         </>
       ) : (
         <>
+          <RenameCard key={s.name} source={s} onChanged={source.reload} />
           <SetupSteps source={s} type={type} onChanged={source.reload} />
           <DeleteConnectorCard source={s} onChanged={source.reload} />
         </>
       )}
     </>
+  )
+}
+
+// The connector's name as people see it everywhere in Lumina (e.g. "FLEXCUBE"). Its code and data stay the same.
+function RenameCard({ source, onChanged }: { source: Source; onChanged: () => void }) {
+  const toast = useToast()
+  const [name, setName] = useState(source.name)
+  const [busy, setBusy] = useState(false)
+  const clean = name.trim()
+  const valid = clean.length >= 2 && clean.length <= 100
+  const save = async () => {
+    setBusy(true)
+    try {
+      await api.updateConnector(source.code, { name: clean })
+      toast('success', `Connector renamed to ${clean}.`)
+      onChanged()
+    } catch (e) {
+      toast('error', (e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Card
+      title="Name"
+      description="The name shown for this connector on every page. Its data and settings stay the same."
+      footer={
+        <button type="button" className="btn btn-primary" disabled={busy || !valid || clean === source.name} onClick={save}>
+          {busy ? 'Saving…' : 'Save name'}
+        </button>
+      }
+    >
+      <div className="form-field">
+        <label htmlFor="connector-name">Connector name</label>
+        <input
+          id="connector-name"
+          className="input"
+          value={name}
+          maxLength={100}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && valid && clean !== source.name && !busy && save()}
+          aria-invalid={!valid}
+        />
+      </div>
+      {!valid && <span className="is-bad-text text-sm">Use 2 to 100 characters.</span>}
+    </Card>
   )
 }
 

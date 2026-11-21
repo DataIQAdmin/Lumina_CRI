@@ -9,6 +9,7 @@ import { Loader } from './components/Loader'
 import { ToastProvider } from './components/Toasts'
 import { OrganizationGate } from './components/OrganizationGate'
 import { WakingBanner } from './components/WakingBanner'
+import { GOLDEN_READY } from './features'
 import { ORG_BASE } from './organization'
 import { AuditPage } from './pages/AuditPage'
 import { ChangePasswordPage } from './pages/ChangePasswordPage'
@@ -62,9 +63,18 @@ function Routed() {
       <Route element={<Layout />}>
         <Route index element={<HomePage />} />
         <Route path="/sources" element={<SourcesPage />} />
-        <Route path="/customers" element={<CustomersPage />} />
-        {can('manage_sources') && <Route path="/customers/mapping" element={<FieldMappingPage />} />}
-        <Route path="/customers/:person" element={<GoldenPage />} />
+        {GOLDEN_READY ? (
+          <>
+            <Route path="/customers" element={<CustomersPage />} />
+            {can('manage_sources') && <Route path="/customers/mapping" element={<FieldMappingPage />} />}
+            <Route path="/customers/:person" element={<GoldenPage />} />
+          </>
+        ) : (
+          <>
+            <Route path="/customers" element={<UnderBuildingPage title="Customers and golden records" />} />
+            <Route path="/customers/*" element={<UnderBuildingPage title="Customers and golden records" />} />
+          </>
+        )}
         <Route path="/review" element={<UnderBuildingPage title="Match review" />} />
         <Route path="/approvals" element={<UnderBuildingPage title="Approvals" />} />
         <Route path="/compliance" element={<UnderBuildingPage title="Compliance" />} />

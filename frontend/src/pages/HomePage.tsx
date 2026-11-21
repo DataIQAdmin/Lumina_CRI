@@ -7,6 +7,7 @@ import { useApi } from '../api/useApi'
 import { useAuth, useCan } from '../auth/AuthContext'
 import { Explain } from '../components/Explain'
 import { Icon, type IconName } from '../components/Icon'
+import { GOLDEN_READY } from '../features'
 import { formatRelative } from '../format'
 
 const n = (v: number) => v.toLocaleString('en-IN')
@@ -31,7 +32,7 @@ export function HomePage() {
   const counts = useApi(() => api.pipeline(), [])
   const sources = useApi(() => api.sources(), [])
   const activity = useApi(() => api.audit({}), [])
-  const canMatch = useCan('view_matches')
+  const canMatch = useCan('view_matches') && GOLDEN_READY
   const match = useApi(() => (canMatch ? api.match() : Promise.resolve(null)), [canMatch])
   const people = useApi(() => (canMatch ? api.people('', '', 1) : Promise.resolve(null)), [canMatch])
   const [attention, setAttention] = useState<Attention[] | null>(null)
@@ -73,9 +74,9 @@ export function HomePage() {
     { done: (c?.rules ?? 0) > 0, title: 'Apply quality rules', detail: c ? `${n(c.rules)} format rule${c.rules === 1 ? '' : 's'}` : '…', action: 'Manage rules', to: '/rules' },
     {
       done: (match.data?.summary.people ?? 0) > 0,
-      title: 'Match customers',
-      detail: match.data ? (match.data.summary.people ? `${n(match.data.summary.people)} customers found` : 'Map fields, then run matching') : '…',
-      action: 'Open customers',
+      title: GOLDEN_READY ? 'Match customers' : 'Customers and golden records',
+      detail: !GOLDEN_READY ? 'Under development' : match.data ? (match.data.summary.people ? `${n(match.data.summary.people)} customers found` : 'Map fields, then run matching') : '…',
+      action: GOLDEN_READY ? 'Open customers' : 'View status',
       to: '/customers',
     },
   ]
