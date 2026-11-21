@@ -4,6 +4,8 @@ import { api } from '../api/client'
 import { OrgLogo } from '../components/OrgLogo'
 import { MatchSettings } from '../components/settings/MatchSettings'
 import { useToast } from '../components/Toasts'
+import { Icon } from '../components/Icon'
+import { GOLDEN_READY } from '../features'
 import { Card, PageHeader } from '../components/ui'
 import { useOrganization } from '../organization'
 
@@ -21,7 +23,18 @@ export function SettingsPage() {
         description={`Settings for ${org.name} only. Other organizations are not affected.`}
       />
       <LogoCard />
-      <MatchSettings />
+      {GOLDEN_READY ? (
+        <MatchSettings />
+      ) : (
+        <section className="card building">
+          <span className="building-icon">
+            <Icon name="layers" size={26} />
+          </span>
+          <span className="building-status">Under development</span>
+          <h2>Matching, trust scores and golden records</h2>
+          <p className="muted">Settings for matching, trust score weights and how golden records are chosen will appear here once golden records are released.</p>
+        </section>
+      )}
     </>
   )
 }
